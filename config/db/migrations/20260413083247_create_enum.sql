@@ -20,5 +20,20 @@ CREATE TYPE audit_action_enum AS ENUM ('create', 'update', 'delete');
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP TYPE IF EXISTS audit_action_enum;
+DROP TYPE IF EXISTS holiday_type_enum;
+DROP TYPE IF EXISTS work_location_type_enum;
+DROP TYPE IF EXISTS override_type_enum;
+DROP TYPE IF EXISTS clock_method_enum;
+DROP TYPE IF EXISTS attendance_status_enum;
+DROP TYPE IF EXISTS approval_status_enum;
+DROP TYPE IF EXISTS leave_request_status_enum;
+DROP TYPE IF EXISTS request_status_enum;
+DROP TYPE IF EXISTS permission_type_enum;
+DROP TYPE IF EXISTS duration_unit_enum;
+DROP TYPE IF EXISTS leave_category_enum;
+DROP TYPE IF EXISTS day_of_week_enum;
+DROP TYPE IF EXISTS contract_type_enum;
+DROP TYPE IF EXISTS marital_status_enum;
+DROP TYPE IF EXISTS gender_enum;
 -- +goose StatementEnd

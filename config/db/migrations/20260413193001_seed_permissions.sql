@@ -1,0 +1,57 @@
+-- +goose Up
+-- +goose StatementBegin
+INSERT INTO permissions (module, action, description) VALUES
+  ('dashboard', 'read', 'Melihat halaman dashboard'),
+  ('employee', 'read', 'Melihat daftar dan detail pegawai'),
+  ('employee', 'create', 'Menambah data pegawai baru'),
+  ('employee', 'update', 'Memperbarui data pegawai'),
+  ('employee', 'delete', 'Menghapus data pegawai'),
+  ('branch', 'read', 'Melihat daftar cabang'),
+  ('branch', 'create', 'Menambah data cabang baru'),
+  ('branch', 'update', 'Memperbarui data cabang'),
+  ('branch', 'delete', 'Menghapus data cabang'),
+  ('department', 'read', 'Melihat daftar departemen'),
+  ('department', 'create', 'Menambah data departemen baru'),
+  ('department', 'update', 'Memperbarui data departemen'),
+  ('department', 'delete', 'Menghapus data departemen'),
+  ('position', 'read', 'Melihat daftar jabatan'),
+  ('position', 'create', 'Menambah data jabatan baru'),
+  ('position', 'update', 'Memperbarui data jabatan'),
+  ('position', 'delete', 'Menghapus data jabatan'),
+  ('role', 'read', 'Melihat daftar peran dan hak akses'),
+  ('role', 'create', 'Menambah peran baru'),
+  ('role', 'update', 'Memperbarui peran dan hak akses'),
+  ('role', 'delete', 'Menghapus peran'),
+  ('leave_type', 'read', 'Melihat tipe cuti'),
+  ('leave_type', 'create', 'Menambah tipe cuti baru'),
+  ('leave_type', 'update', 'Memperbarui tipe cuti'),
+  ('leave_type', 'delete', 'Menghapus tipe cuti'),
+  ('shift', 'read', 'Melihat jadwal shift'),
+  ('shift', 'create', 'Menambah jadwal shift baru'),
+  ('shift', 'update', 'Memperbarui jadwal shift'),
+  ('shift', 'delete', 'Menghapus jadwal shift'),
+  ('holiday', 'read', 'Melihat daftar hari libur'),
+  ('holiday', 'create', 'Menambah hari libur baru'),
+  ('holiday', 'update', 'Memperbarui hari libur'),
+  ('holiday', 'delete', 'Menghapus hari libur'),
+  ('attendance', 'read', 'Melihat data presensi'),
+  ('attendance', 'create', 'Melakukan presensi manual'),
+  ('attendance', 'update', 'Memperbarui atau menyetujui presensi'),
+  ('leave', 'read', 'Melihat daftar pengajuan cuti'),
+  ('leave', 'create', 'Membuat pengajuan cuti'),
+  ('leave', 'update', 'Menyetujui atau menolak cuti'),
+  ('request', 'read', 'Melihat daftar permohonan'),
+  ('request', 'create', 'Membuat permohonan baru'),
+  ('request', 'update', 'Menyetujui atau menolak permohonan'),
+  ('daily_report', 'read', 'Melihat laporan harian'),
+  ('daily_report', 'create', 'Membuat laporan harian'),
+  ('daily_report', 'update', 'Memperbarui laporan harian'),
+  ('mutabaah', 'read', 'Melihat log mutabaah'),
+  ('mutabaah', 'create', 'Membuat log mutabaah'),
+  ('mutabaah', 'update', 'Memperbarui log mutabaah');
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+TRUNCATE permissions RESTART IDENTITY CASCADE;
+-- +goose StatementEnd

@@ -3,8 +3,6 @@
 -- employees
 CREATE INDEX idx_employees_branch_id      ON employees(branch_id);
 CREATE INDEX idx_employees_department_id  ON employees(department_id);
-CREATE INDEX idx_employees_role_id        ON employees(role_id);
-CREATE INDEX idx_employees_is_active      ON employees(is_active) WHERE deleted_at IS NULL;
 CREATE INDEX idx_employees_is_trainer     ON employees(is_trainer) WHERE deleted_at IS NULL;
 
 -- employee_schedules
@@ -62,5 +60,36 @@ CREATE INDEX idx_audit_logs_created_at    ON audit_logs(created_at);
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP INDEX IF EXISTS idx_audit_logs_created_at;
+DROP INDEX IF EXISTS idx_audit_logs_employee;
+DROP INDEX IF EXISTS idx_audit_logs_table;
+DROP INDEX IF EXISTS idx_holidays_branch;
+DROP INDEX IF EXISTS idx_holidays_date;
+DROP INDEX IF EXISTS idx_leave_balances_employee;
+DROP INDEX IF EXISTS idx_overrides_status;
+DROP INDEX IF EXISTS idx_overrides_log_id;
+DROP INDEX IF EXISTS idx_business_trip_status;
+DROP INDEX IF EXISTS idx_business_trip_employee;
+DROP INDEX IF EXISTS idx_overtime_status;
+DROP INDEX IF EXISTS idx_overtime_employee;
+DROP INDEX IF EXISTS idx_permission_req_status;
+DROP INDEX IF EXISTS idx_permission_req_date;
+DROP INDEX IF EXISTS idx_permission_req_employee;
+DROP INDEX IF EXISTS idx_leave_requests_status;
+DROP INDEX IF EXISTS idx_leave_requests_employee;
+DROP INDEX IF EXISTS idx_daily_report_submitted;
+DROP INDEX IF EXISTS idx_daily_report_date;
+DROP INDEX IF EXISTS idx_daily_report_employee;
+DROP INDEX IF EXISTS idx_mutabaah_is_submitted;
+DROP INDEX IF EXISTS idx_mutabaah_log_date;
+DROP INDEX IF EXISTS idx_mutabaah_employee_date;
+DROP INDEX IF EXISTS idx_attendance_status;
+DROP INDEX IF EXISTS idx_attendance_date;
+DROP INDEX IF EXISTS idx_attendance_employee_date;
+DROP INDEX IF EXISTS idx_schedules_effective_date;
+DROP INDEX IF EXISTS idx_schedules_employee_id;
+DROP INDEX IF EXISTS idx_employees_is_trainer;
+
+DROP INDEX IF EXISTS idx_employees_department_id;
+DROP INDEX IF EXISTS idx_employees_branch_id;
 -- +goose StatementEnd

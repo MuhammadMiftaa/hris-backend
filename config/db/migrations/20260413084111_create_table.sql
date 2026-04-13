@@ -76,8 +76,8 @@ CREATE TABLE employees (
   id               SERIAL PRIMARY KEY,
   employee_number  VARCHAR(20)          NOT NULL UNIQUE,
   full_name        VARCHAR(150)         NOT NULL,
-  nik              VARCHAR(16)          UNIQUE,
-  npwp             VARCHAR(20)          UNIQUE,
+  nik              VARCHAR(16),
+  npwp             VARCHAR(20),
   kk_number        VARCHAR(16),
   birth_date       DATE                 NOT NULL,
   birth_place      VARCHAR(100),
@@ -111,8 +111,8 @@ CREATE TABLE accounts (
   is_active       BOOLEAN               NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMP             NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMP,
-  deleted_at      TIMESTAMP,
-)
+  deleted_at      TIMESTAMP
+);
 
 -- -----------------------------------------------------------------------------
 -- 7. ROLE PERMISSIONS
@@ -484,5 +484,30 @@ CREATE TABLE audit_logs (
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS holidays CASCADE;
+DROP TABLE IF EXISTS overtime_requests CASCADE;
+DROP TABLE IF EXISTS attendance_overrides CASCADE;
+DROP TABLE IF EXISTS daily_reports CASCADE;
+DROP TABLE IF EXISTS mutabaah_logs CASCADE;
+DROP TABLE IF EXISTS attendance_logs CASCADE;
+DROP TABLE IF EXISTS business_trip_requests CASCADE;
+DROP TABLE IF EXISTS leave_request_approvals CASCADE;
+DROP TABLE IF EXISTS leave_requests CASCADE;
+DROP TABLE IF EXISTS permission_requests CASCADE;
+DROP TABLE IF EXISTS leave_balances CASCADE;
+DROP TABLE IF EXISTS leave_types CASCADE;
+DROP TABLE IF EXISTS employee_schedules CASCADE;
+DROP TABLE IF EXISTS shift_template_details CASCADE;
+DROP TABLE IF EXISTS shift_templates CASCADE;
+DROP TABLE IF EXISTS employment_contracts CASCADE;
+DROP TABLE IF EXISTS employee_contacts CASCADE;
+DROP TABLE IF EXISTS role_permissions CASCADE;
+DROP TABLE IF EXISTS accounts CASCADE;
+DROP TABLE IF EXISTS employees CASCADE;
+DROP TABLE IF EXISTS job_positions CASCADE;
+DROP TABLE IF EXISTS departments CASCADE;
+DROP TABLE IF EXISTS permissions CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS branches CASCADE;
 -- +goose StatementEnd
