@@ -33,7 +33,7 @@ CREATE TABLE roles (
 -- 2. PERMISSIONS
 -- -----------------------------------------------------------------------------
 CREATE TABLE permissions (
-  id          SERIAL PRIMARY KEY,
+  code        VARCHAR(100) PRIMARY KEY,
   module      VARCHAR(100) NOT NULL,
   action      VARCHAR(100) NOT NULL,
   description TEXT,
@@ -106,7 +106,7 @@ CREATE TABLE accounts (
   employee_id     INTEGER               NOT NULL REFERENCES employees(id),
   role_id         INTEGER               NOT NULL REFERENCES roles(id),
   email           VARCHAR(150)          NOT NULL UNIQUE,
-  password_hash   TEXT                  NOT NULL,
+  password        TEXT                  NOT NULL,
   last_login_at   TIMESTAMP,
   is_active       BOOLEAN               NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMP             NOT NULL DEFAULT NOW(),
@@ -118,11 +118,11 @@ CREATE TABLE accounts (
 -- 7. ROLE PERMISSIONS
 -- -----------------------------------------------------------------------------
 CREATE TABLE role_permissions (
-  id            SERIAL PRIMARY KEY,
-  role_id       INTEGER NOT NULL REFERENCES roles(id),
-  permission_id INTEGER NOT NULL REFERENCES permissions(id),
-  created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
-  UNIQUE (role_id, permission_id)
+  id              SERIAL PRIMARY KEY,
+  role_id         INTEGER NOT NULL REFERENCES roles(id),
+  permission_code VARCHAR(100) NOT NULL REFERENCES permissions(code),
+  created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (role_id, permission_code)
 );
 
 -- -----------------------------------------------------------------------------

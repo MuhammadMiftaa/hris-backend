@@ -6,7 +6,7 @@ INSERT INTO employees (
   1, 'EMP-001', 'Muhammad Miftakul Salam', '2003-12-27', 'Surabaya', 'male', 'Islam', 'single', 'WNI', false, 1
 );
 
-INSERT INTO accounts (id, employee_id, role_id, email, password_hash)
+INSERT INTO accounts (id, employee_id, role_id, email, password)
 VALUES (
   1, 1, 1, 'mifta@wafa.id', '$2a$10$3bhH2nExhbXZtNHljOGn5OXHJ.yJiJxA0jTvKDcNbZusXgsUO/LCS'
 );

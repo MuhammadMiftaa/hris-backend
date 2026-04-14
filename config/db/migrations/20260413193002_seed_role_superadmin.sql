@@ -3,8 +3,8 @@
 INSERT INTO roles (id, name, description)
 VALUES (1, 'Superadmin', 'Memiliki akses penuh ke seluruh fitur dan fungsi sistem HRIS di semua cabang');
 
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT 1, id FROM permissions;
+INSERT INTO role_permissions (role_id, permission_code)
+SELECT 1, code FROM permissions;
 -- +goose StatementEnd
 
 -- +goose Down
