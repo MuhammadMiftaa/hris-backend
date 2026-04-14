@@ -1,16 +1,16 @@
 package middleware
 
 import (
+	"errors"
 	"strings"
 
-	"hris-backend/config/env"
+	"hris-backend/internal/redis"
 	"hris-backend/internal/struct/dto"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-func AuthMiddleware() fiber.Handler {
+func AuthMiddleware(rdb redis.Redis) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -30,15 +30,18 @@ func AuthMiddleware() fiber.Handler {
 			})
 		}
 
-		tokenString := parts[1]
-		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fiber.NewError(fiber.StatusUnauthorized, "unexpected signing method")
-			}
-			return []byte(env.Cfg.Server.JWTSecret), nil
-		})
+		accessToken := parts[1]
 
-		if err != nil || !token.Valid {
+		isExist, err := rdb.Exists(c.Context(), accessToken)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{
+				Status:     false,
+				StatusCode: 401,
+				Message:    "Failed to check token existence",
+			})
+		}
+
+		if isExist == 0 {
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{
 				Status:     false,
 				StatusCode: 401,
@@ -46,21 +49,26 @@ func AuthMiddleware() fiber.Handler {
 			})
 		}
 
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
+		token, err := redis.GetToken(c.Context(), rdb, accessToken)
+		if err != nil {
+			if errors.Is(err, redis.ServerErrInvalidToken) || errors.Is(err, redis.ServerErrTokenExpired) {
+				return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{
+					Status:     false,
+					StatusCode: 401,
+					Message:    "Invalid or expired token",
+				})
+			}
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{
 				Status:     false,
-				StatusCode: 401,
-				Message:    "Invalid token claims",
+				StatusCode: 500,
+				Message:    "Internal Server Error",
 			})
 		}
 
-		userData := dto.UserData{
-			ID:    claims["id"].(string),
-			Email: claims["email"].(string),
-		}
-
-		c.Locals("user_data", userData)
+		c.Locals("token", accessToken)
+		c.Locals("account", token.Account)
+		c.Locals("permissions", token.Permissions)
+		c.Locals("refresh_token", token.Refresh)
 		return c.Next()
 	}
 }

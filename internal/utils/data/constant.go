@@ -1,9 +1,13 @@
 package data
 
+import "time"
+
 var (
 	DEVELOPMENT_MODE = "development"
 	STAGING_MODE     = "staging"
 	PRODUCTION_MODE  = "production"
+
+	SESSION_TTL = 3 * 24 * time.Hour
 
 	// REQUEST_ID_HEADER is the standard header name used to propagate request IDs.
 	REQUEST_ID_HEADER = "X-Request-ID"

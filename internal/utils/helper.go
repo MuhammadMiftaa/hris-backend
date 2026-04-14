@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"math/rand"
 	"time"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,4 +18,25 @@ func PasswordHashing(str string) (string, error) {
 	}
 
 	return string(hashPassword), nil
+}
+
+func IsPasswordMatch(hashPassword, reqPassword string) bool {
+	hash, pass := []byte(hashPassword), []byte(reqPassword)
+
+	err := bcrypt.CompareHashAndPassword(hash, pass)
+	return err == nil
+}
+
+func GenerateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	if length <= 0 {
+		length = 16
+	}
+
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }

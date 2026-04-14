@@ -3,6 +3,7 @@ package router
 import (
 	"hris-backend/config/db"
 	"hris-backend/interface/http/middleware"
+	"hris-backend/interface/http/route"
 	"hris-backend/internal/redis"
 	"hris-backend/internal/struct/dto"
 
@@ -43,6 +44,8 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis) *f
 		})
 	})
 
+	// Auth routes
+	route.AuthRoutes(app, dbInstance.GetDB(), redisInstance)
 
 	return app
 }
