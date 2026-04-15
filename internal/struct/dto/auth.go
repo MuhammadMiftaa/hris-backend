@@ -11,8 +11,11 @@ type LoginReq struct {
 	Password string `json:"password"`
 }
 
-type RefreshTokenReq struct {
-	
+type LoginRes struct {
+	Token       string                  `json:"token"`
+	Refresh     string                  `json:"refresh"`
+	Permissions []string                `json:"permissions"`
+	Account     GetEmployeeByIDResponse `json:"account"`
 }
 
 type GetAccountByEmailResponse struct {
@@ -37,13 +40,6 @@ type GetEmployeeByIDResponse struct {
 	JobPositionsID *uint          `json:"job_positions_id" gorm:"column:job_positions_id"`
 	RoleName       string         `json:"role_name" gorm:"column:role_name"`
 	Permissions    datatypes.JSON `json:"permissions,omitempty" gorm:"column:permissions"`
-}
-
-type LoginRes struct {
-	Token       string                  `json:"token"`
-	Refresh     string                  `json:"refresh"`
-	Permissions []string                `json:"permissions"`
-	Account     GetEmployeeByIDResponse `json:"account"`
 }
 
 type Token struct {
