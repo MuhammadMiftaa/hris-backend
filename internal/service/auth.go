@@ -18,6 +18,7 @@ import (
 type AuthService interface {
 	Login(ctx context.Context, req dto.LoginReq) (dto.LoginRes, error)
 	Refresh(ctx context.Context, refreshToken string) (dto.LoginRes, error)
+	Logout(ctx context.Context, accessToken, refreshToken string) error
 }
 
 type authService struct {
@@ -127,7 +128,7 @@ func (s *authService) Refresh(ctx context.Context, refreshToken string) (dto.Log
 	if err := redis.SetRefreshToken(ctx, s.redis, newRefresh, newTokenPayload); err != nil {
 		return dto.LoginRes{}, fmt.Errorf("failed to set refresh session: %w", err)
 	}
-	s.redis.Del(ctx, "refresh:"+refreshToken)
+	redis.DelRefreshToken(ctx, s.redis, refreshToken)
 
 	return dto.LoginRes{
 		Token:       newAccessToken,
@@ -135,4 +136,10 @@ func (s *authService) Refresh(ctx context.Context, refreshToken string) (dto.Log
 		Account:     tokenData.Account,
 		Permissions: tokenData.Permissions,
 	}, nil
+}
+
+func (s *authService) Logout(ctx context.Context, accessToken, refreshToken string) error {
+	redis.DelToken(ctx, s.redis, accessToken)
+	redis.DelRefreshToken(ctx, s.redis, refreshToken)
+	return nil
 }

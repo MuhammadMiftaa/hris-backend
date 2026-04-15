@@ -73,3 +73,16 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 		Data:       result,
 	})
 }
+
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	accessToken := c.Locals("token").(string)
+	refreshToken := c.Locals("refresh_token").(string)
+
+	h.service.Logout(c.Context(), accessToken, refreshToken)
+
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: fiber.StatusOK,
+		Message:    "Logout successful",
+	})
+}

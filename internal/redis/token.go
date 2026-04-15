@@ -14,10 +14,8 @@ import (
 
 const (
 	TokenLen                = 12
-	TokenAuthRefreshExp     = time.Minute * 1450  // 1 days 10 minutes
-	TokenAuthSessionExp     = time.Minute * 1440  // 1 days
-	TokenAuthLongSessionExp = time.Hour * 24 * 7  // 7 days
-	TokenAuthLongRefreshExp = time.Hour * 24 * 30 // 30 days
+	TokenAuthSessionExp     = time.Hour * 1       // 1 jam
+	TokenAuthRefreshExp     = time.Hour * 24 * 30 // 30 hari
 
 	ServerAuthMsgInvalidToken = "invalid verification token"
 	ServerAuthMsgTokenExpired = "token expired, please refresh your token"
@@ -209,5 +207,19 @@ func GetRefreshToken(ctx context.Context, rdb Redis, refreshToken string) (*dto.
 	if err := json.Unmarshal([]byte(jt), &token); err != nil {
 		return nil, err
 	}
+
+	err = CheckToken(&token)
+	if err != nil {
+		return nil, fmt.Errorf("auth: error checking refresh token: %w", err)
+	}
+
 	return &token, nil
+}
+
+func DelRefreshToken(ctx context.Context, rdb Redis, refreshToken string) error {
+	_, err := rdb.Del(ctx, "refresh:"+refreshToken)
+	if err != nil {
+		return fmt.Errorf("auth: error deleting refresh token %w", err)
+	}
+	return nil
 }
