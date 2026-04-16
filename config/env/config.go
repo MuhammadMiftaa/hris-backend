@@ -28,10 +28,17 @@ type (
 		DB       string `env:"REDIS_DB"`
 	}
 
+	Minio struct {
+		Host        string `env:"MINIO_HOST"`
+		AccessKey   string `env:"MINIO_ROOT_USER"`
+		SecretKey   string `env:"MINIO_ROOT_PASSWORD"`
+	}
+
 	Config struct {
 		Server   Server
 		Database Database
 		Redis    Redis
+		Minio    Minio
 	}
 )
 
@@ -72,6 +79,10 @@ func LoadNative() ([]string, error) {
 	lookupEnv("REDIS_ADDRESS", &Cfg.Redis.Address, &missing)
 	Cfg.Redis.Password, _ = os.LookupEnv("REDIS_PASSWORD")
 	Cfg.Redis.DB, _ = os.LookupEnv("REDIS_DB")
+
+	lookupEnv("MINIO_HOST", &Cfg.Minio.Host, &missing)
+	lookupEnv("MINIO_ROOT_USER", &Cfg.Minio.AccessKey, &missing)
+	lookupEnv("MINIO_ROOT_PASSWORD", &Cfg.Minio.SecretKey, &missing)
 
 	return missing, nil
 }
