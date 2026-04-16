@@ -1,8 +1,10 @@
 package route
 
 import (
+	"hris-backend/interface/http/handler"
 	"hris-backend/interface/http/middleware"
-	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/repository"
+	"hris-backend/internal/service"
 	"hris-backend/internal/utils/data"
 
 	"github.com/gofiber/fiber/v2"
@@ -10,47 +12,27 @@ import (
 )
 
 func ShiftRoutes(app *fiber.App, db *gorm.DB) {
+	repo := repository.NewShiftRepository(db)
+	txManager := repository.NewTxManager(db)
+	h := handler.NewShiftHandler(service.NewShiftService(repo, txManager))
+
 	shifts := app.Group("/shifts")
 	{
-		shifts.Get("/metadata", func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift metadata", Data: map[string]any{}})
-		})
-		shifts.Get("/", middleware.RBACMiddleware(data.PERM_ShiftRead), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift template list", Data: []any{}})
-		})
-		shifts.Get("/:id", middleware.RBACMiddleware(data.PERM_ShiftRead), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift template detail", Data: map[string]any{}})
-		})
-		shifts.Post("/", middleware.RBACMiddleware(data.PERM_ShiftCreate), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 201, Message: "Shift template created"})
-		})
-		shifts.Put("/:id", middleware.RBACMiddleware(data.PERM_ShiftUpdate), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift template updated"})
-		})
-		shifts.Delete("/:id", middleware.RBACMiddleware(data.PERM_ShiftDelete), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift template deleted"})
-		})
-		shifts.Get("/:id/details", middleware.RBACMiddleware(data.PERM_ShiftRead), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift details list", Data: []any{}})
-		})
+		shifts.Get("/metadata", h.Metadata)
+		shifts.Get("/", middleware.RBACMiddleware(data.PERM_ShiftRead), h.ListTemplates)
+		shifts.Get("/:id", middleware.RBACMiddleware(data.PERM_ShiftRead), h.DetailTemplate)
+		shifts.Post("/", middleware.RBACMiddleware(data.PERM_ShiftCreate), h.CreateTemplate)
+		shifts.Put("/:id", middleware.RBACMiddleware(data.PERM_ShiftUpdate), h.UpdateTemplate)
+		shifts.Delete("/:id", middleware.RBACMiddleware(data.PERM_ShiftDelete), h.DeleteTemplate)
+		shifts.Get("/:id/details", middleware.RBACMiddleware(data.PERM_ShiftRead), h.ListDetails)
 	}
 
 	schedules := app.Group("/schedules")
 	{
-		schedules.Get("/", middleware.RBACMiddleware(data.PERM_ShiftRead), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Schedule list", Data: []any{}})
-		})
-		schedules.Get("/:id", middleware.RBACMiddleware(data.PERM_ShiftRead), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Schedule detail", Data: map[string]any{}})
-		})
-		schedules.Post("/", middleware.RBACMiddleware(data.PERM_ShiftCreate), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 201, Message: "Schedule created"})
-		})
-		schedules.Put("/:id", middleware.RBACMiddleware(data.PERM_ShiftUpdate), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Schedule updated"})
-		})
-		schedules.Delete("/:id", middleware.RBACMiddleware(data.PERM_ShiftDelete), func(c *fiber.Ctx) error {
-			return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Schedule deleted"})
-		})
+		schedules.Get("/", middleware.RBACMiddleware(data.PERM_ShiftRead), h.ListSchedules)
+		schedules.Get("/:id", middleware.RBACMiddleware(data.PERM_ShiftRead), h.DetailSchedule)
+		schedules.Post("/", middleware.RBACMiddleware(data.PERM_ShiftCreate), h.CreateSchedule)
+		schedules.Put("/:id", middleware.RBACMiddleware(data.PERM_ShiftUpdate), h.UpdateSchedule)
+		schedules.Delete("/:id", middleware.RBACMiddleware(data.PERM_ShiftDelete), h.DeleteSchedule)
 	}
 }

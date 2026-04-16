@@ -28,6 +28,20 @@ type EmployeeRepository interface {
 	UpdateAccount(ctx context.Context, tx Transaction, req model.Account) (model.Account, error)
 	UpdateAccountPassword(ctx context.Context, tx Transaction, employeeID string, hashedPassword string) error
 	DeleteAccount(ctx context.Context, tx Transaction, accountID string) error
+
+	// Contact
+	GetContactsByEmployeeID(ctx context.Context, tx Transaction, employeeID string) ([]dto.EmployeeContactResponse, error)
+	GetContactByID(ctx context.Context, tx Transaction, contactID string) (dto.EmployeeContactResponse, error)
+	CreateContact(ctx context.Context, tx Transaction, req model.EmployeeContact) (model.EmployeeContact, error)
+	UpdateContact(ctx context.Context, tx Transaction, contactID string, req model.EmployeeContact) (model.EmployeeContact, error)
+	DeleteContact(ctx context.Context, tx Transaction, contactID string) error
+
+	// Contract
+	GetContractsByEmployeeID(ctx context.Context, tx Transaction, employeeID string) ([]dto.ContractResponse, error)
+	GetContractByID(ctx context.Context, tx Transaction, contractID string) (dto.ContractResponse, error)
+	CreateContract(ctx context.Context, tx Transaction, req model.EmploymentContract) (model.EmploymentContract, error)
+	UpdateContract(ctx context.Context, tx Transaction, contractID string, req model.EmploymentContract) (model.EmploymentContract, error)
+	DeleteContract(ctx context.Context, tx Transaction, contractID string) error
 }
 
 type employeeRepository struct {
@@ -337,5 +351,158 @@ func (r *employeeRepository) UpdateAccountPassword(ctx context.Context, tx Trans
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("account not found for employee %s", employeeID)
 	}
+	return nil
+}
+
+// ~ Contact
+func (r *employeeRepository) GetContactsByEmployeeID(ctx context.Context, tx Transaction, employeeID string) ([]dto.EmployeeContactResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	var contacts []dto.EmployeeContactResponse
+	if err := db.Model(&model.EmployeeContact{}).
+		Where("employee_id = ? AND deleted_at IS NULL", employeeID).
+		Order("is_primary DESC, created_at DESC").
+		Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+	return contacts, nil
+}
+
+func (r *employeeRepository) GetContactByID(ctx context.Context, tx Transaction, contactID string) (dto.EmployeeContactResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return dto.EmployeeContactResponse{}, err
+	}
+
+	var contact dto.EmployeeContactResponse
+	if err := db.Model(&model.EmployeeContact{}).Where("id = ? AND deleted_at IS NULL", contactID).First(&contact).Error; err != nil {
+		return dto.EmployeeContactResponse{}, err
+	}
+
+	return contact, nil
+}
+
+func (r *employeeRepository) CreateContact(ctx context.Context, tx Transaction, req model.EmployeeContact) (model.EmployeeContact, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return model.EmployeeContact{}, err
+	}
+
+	if err := db.Create(&req).Error; err != nil {
+		return model.EmployeeContact{}, err
+	}
+
+	return req, nil
+}
+
+func (r *employeeRepository) UpdateContact(ctx context.Context, tx Transaction, contactID string, req model.EmployeeContact) (model.EmployeeContact, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return model.EmployeeContact{}, err
+	}
+
+	if err := db.Model(&model.EmployeeContact{}).Where("id = ?", contactID).Updates(req).Error; err != nil {
+		return model.EmployeeContact{}, err
+	}
+
+	req.ID = 0 // Will query for ID in service layer typically, or just return as is
+	return req, nil
+}
+
+func (r *employeeRepository) DeleteContact(ctx context.Context, tx Transaction, contactID string) error {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	if err := db.Where("id = ?", contactID).Delete(&model.EmployeeContact{}).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ~ Contract
+func (r *employeeRepository) GetContractsByEmployeeID(ctx context.Context, tx Transaction, employeeID string) ([]dto.ContractResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	var contracts []dto.ContractResponse
+	if err := db.Raw(`
+		SELECT
+			id, employee_id, contract_number, contract_type::TEXT AS contract_type,
+			start_date::TEXT AS start_date, end_date::TEXT AS end_date,
+			salary, notes, created_at, updated_at, deleted_at
+		FROM employment_contracts
+		WHERE employee_id = ? AND deleted_at IS NULL
+		ORDER BY start_date DESC
+	`, employeeID).Scan(&contracts).Error; err != nil {
+		return nil, err
+	}
+	return contracts, nil
+}
+
+func (r *employeeRepository) GetContractByID(ctx context.Context, tx Transaction, contractID string) (dto.ContractResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return dto.ContractResponse{}, err
+	}
+
+	var contract dto.ContractResponse
+	if err := db.Raw(`
+		SELECT
+			id, employee_id, contract_number, contract_type::TEXT AS contract_type,
+			start_date::TEXT AS start_date, end_date::TEXT AS end_date,
+			salary, notes, created_at, updated_at, deleted_at
+		FROM employment_contracts
+		WHERE id = ? AND deleted_at IS NULL
+	`, contractID).Scan(&contract).Error; err != nil {
+		return dto.ContractResponse{}, err
+	}
+
+	return contract, nil
+}
+
+func (r *employeeRepository) CreateContract(ctx context.Context, tx Transaction, req model.EmploymentContract) (model.EmploymentContract, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return model.EmploymentContract{}, err
+	}
+
+	if err := db.Create(&req).Error; err != nil {
+		return model.EmploymentContract{}, err
+	}
+
+	return req, nil
+}
+
+func (r *employeeRepository) UpdateContract(ctx context.Context, tx Transaction, contractID string, req model.EmploymentContract) (model.EmploymentContract, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return model.EmploymentContract{}, err
+	}
+
+	if err := db.Model(&model.EmploymentContract{}).Where("id = ?", contractID).Updates(req).Error; err != nil {
+		return model.EmploymentContract{}, err
+	}
+
+	return req, nil
+}
+
+func (r *employeeRepository) DeleteContract(ctx context.Context, tx Transaction, contractID string) error {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	if err := db.Where("id = ?", contractID).Delete(&model.EmploymentContract{}).Error; err != nil {
+		return err
+	}
+
 	return nil
 }

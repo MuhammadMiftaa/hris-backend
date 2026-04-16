@@ -76,6 +76,7 @@ type EmployeeMetadata struct {
 	MaritalStatusMeta []Meta `json:"marital_status_meta"`
 	BloodTypeMeta     []Meta `json:"blood_type_meta"`
 	StatusMeta        []Meta `json:"status_meta"`
+	ContractTypeMeta  []Meta `json:"contract_type_meta"`
 }
 
 type NewEmployeeCred struct {

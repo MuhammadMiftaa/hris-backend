@@ -109,7 +109,6 @@ var (
 	}
 
 	HolidayTypeMeta = []dto.Meta{
-		{ID: "public", Name: "Libur Umum"},
 		{ID: "national", Name: "Nasional"},
 		{ID: "joint", Name: "Cuti Bersama"},
 		{ID: "observance", Name: "Peringatan"},

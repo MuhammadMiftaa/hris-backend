@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
@@ -19,6 +21,18 @@ type EmployeeService interface {
 	UpdateEmployee(ctx context.Context, id string, req dto.UpdateEmployeeRequest) (dto.Employee, error)
 	DeleteEmployee(ctx context.Context, employeeID string) error
 	ResetPassword(ctx context.Context, employeeID string, req dto.ResetPasswordRequest) error
+
+	// Contact
+	GetContactsByEmployeeID(ctx context.Context, employeeID string) ([]dto.EmployeeContactResponse, error)
+	CreateContact(ctx context.Context, employeeID string, req dto.CreateContactRequest) (dto.EmployeeContactResponse, error)
+	UpdateContact(ctx context.Context, contactID string, req dto.UpdateContactRequest) (dto.EmployeeContactResponse, error)
+	DeleteContact(ctx context.Context, contactID string) error
+
+	// Contract
+	GetContractsByEmployeeID(ctx context.Context, employeeID string) ([]dto.ContractResponse, error)
+	CreateContract(ctx context.Context, employeeID string, req dto.CreateContractRequest) (dto.ContractResponse, error)
+	UpdateContract(ctx context.Context, contractID string, req dto.UpdateContractRequest) (dto.ContractResponse, error)
+	DeleteContract(ctx context.Context, contractID string) error
 }
 
 type employeeService struct {
@@ -64,6 +78,7 @@ func (s *employeeService) GetMetadata(ctx context.Context) (dto.EmployeeMetadata
 		MaritalStatusMeta: data.MaritalStatusMeta,
 		BloodTypeMeta:     data.BloodTypeMeta,
 		StatusMeta:        data.StatusMeta,
+		ContractTypeMeta:  data.ContractTypeMeta,
 	}, nil
 }
 
@@ -328,4 +343,181 @@ func (s *employeeService) ResetPassword(ctx context.Context, employeeID string, 
 	}
 
 	return nil
+}
+
+// ~ Contact
+func (s *employeeService) GetContactsByEmployeeID(ctx context.Context, employeeID string) ([]dto.EmployeeContactResponse, error) {
+	return s.repo.GetContactsByEmployeeID(ctx, nil, employeeID)
+}
+
+func (s *employeeService) CreateContact(ctx context.Context, employeeID string, req dto.CreateContactRequest) (dto.EmployeeContactResponse, error) {
+	if req.ContactType == "" || req.ContactValue == "" {
+		return dto.EmployeeContactResponse{}, fmt.Errorf("contact_type and contact_value are required")
+	}
+
+	empIDParams, err := strconv.ParseUint(employeeID, 10, 64)
+	if err != nil {
+		return dto.EmployeeContactResponse{}, err
+	}
+
+	modelReq := model.EmployeeContact{
+		EmployeeID:   uint(empIDParams),
+		ContactType:  req.ContactType,
+		ContactValue: req.ContactValue,
+		ContactLabel: req.ContactLabel,
+	}
+	if req.IsPrimary != nil {
+		modelReq.IsPrimary = *req.IsPrimary
+	}
+
+	created, err := s.repo.CreateContact(ctx, nil, modelReq)
+	if err != nil {
+		return dto.EmployeeContactResponse{}, err
+	}
+	return s.repo.GetContactByID(ctx, nil, fmt.Sprintf("%d", created.ID))
+}
+
+func (s *employeeService) UpdateContact(ctx context.Context, contactID string, req dto.UpdateContactRequest) (dto.EmployeeContactResponse, error) {
+	existing, err := s.repo.GetContactByID(ctx, nil, contactID)
+	if err != nil {
+		return dto.EmployeeContactResponse{}, err
+	}
+
+	modelReq := model.EmployeeContact{
+		ContactType:  existing.ContactType,
+		ContactValue: existing.ContactValue,
+		ContactLabel: existing.ContactLabel,
+		IsPrimary:    existing.IsPrimary,
+	}
+
+	if req.ContactType != nil {
+		modelReq.ContactType = *req.ContactType
+	}
+	if req.ContactValue != nil {
+		modelReq.ContactValue = *req.ContactValue
+	}
+	if req.ContactLabel != nil {
+		modelReq.ContactLabel = req.ContactLabel
+	}
+	if req.IsPrimary != nil {
+		modelReq.IsPrimary = *req.IsPrimary
+	}
+
+	if _, err := s.repo.UpdateContact(ctx, nil, contactID, modelReq); err != nil {
+		return dto.EmployeeContactResponse{}, err
+	}
+
+	return s.repo.GetContactByID(ctx, nil, contactID)
+}
+
+func (s *employeeService) DeleteContact(ctx context.Context, contactID string) error {
+	return s.repo.DeleteContact(ctx, nil, contactID)
+}
+
+// ~ Contract
+func (s *employeeService) GetContractsByEmployeeID(ctx context.Context, employeeID string) ([]dto.ContractResponse, error) {
+	return s.repo.GetContractsByEmployeeID(ctx, nil, employeeID)
+}
+
+func (s *employeeService) CreateContract(ctx context.Context, employeeID string, req dto.CreateContractRequest) (dto.ContractResponse, error) {
+	if req.ContractNumber == "" || req.ContractType == "" || req.StartDate == "" {
+		return dto.ContractResponse{}, fmt.Errorf("contract_number, contract_type, and start_date are required")
+	}
+
+	empIDParams, err := strconv.ParseUint(employeeID, 10, 64)
+	if err != nil {
+		return dto.ContractResponse{}, err
+	}
+
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	if err != nil {
+		return dto.ContractResponse{}, fmt.Errorf("invalid start_date format")
+	}
+
+	var endDate *time.Time
+	if req.EndDate != nil && *req.EndDate != "" {
+		parsed, err := time.Parse("2006-01-02", *req.EndDate)
+		if err != nil {
+			return dto.ContractResponse{}, fmt.Errorf("invalid end_date format")
+		}
+		endDate = &parsed
+	}
+
+	modelReq := model.EmploymentContract{
+		EmployeeID:     uint(empIDParams),
+		ContractNumber: req.ContractNumber,
+		ContractType:   model.ContractTypeEnum(req.ContractType),
+		StartDate:      &startDate,
+		EndDate:        endDate,
+		Salary:         &req.Salary,
+		Notes:          req.Notes,
+	}
+
+	created, err := s.repo.CreateContract(ctx, nil, modelReq)
+	if err != nil {
+		return dto.ContractResponse{}, err
+	}
+
+	return s.repo.GetContractByID(ctx, nil, fmt.Sprintf("%d", created.ID))
+}
+
+func (s *employeeService) UpdateContract(ctx context.Context, contractID string, req dto.UpdateContractRequest) (dto.ContractResponse, error) {
+	existing, err := s.repo.GetContractByID(ctx, nil, contractID)
+	if err != nil {
+		return dto.ContractResponse{}, err
+	}
+
+	startDate, _ := time.Parse("2006-01-02", existing.StartDate)
+	modelReq := model.EmploymentContract{
+		ContractNumber: existing.ContractNumber,
+		ContractType:   model.ContractTypeEnum(existing.ContractType),
+		StartDate:      &startDate,
+		Salary:         &existing.Salary,
+		Notes:          existing.Notes,
+	}
+	if existing.EndDate != nil {
+		endDate, _ := time.Parse("2006-01-02", *existing.EndDate)
+		modelReq.EndDate = &endDate
+	}
+
+	if req.ContractNumber != nil {
+		modelReq.ContractNumber = *req.ContractNumber
+	}
+	if req.ContractType != nil {
+		modelReq.ContractType = model.ContractTypeEnum(*req.ContractType)
+	}
+	if req.StartDate != nil {
+		d, err := time.Parse("2006-01-02", *req.StartDate)
+		if err != nil {
+			return dto.ContractResponse{}, fmt.Errorf("invalid start_date format")
+		}
+		modelReq.StartDate = &d
+	}
+	if req.EndDate != nil {
+		if *req.EndDate == "" {
+			modelReq.EndDate = nil
+		} else {
+			d, err := time.Parse("2006-01-02", *req.EndDate)
+			if err != nil {
+				return dto.ContractResponse{}, fmt.Errorf("invalid end_date format")
+			}
+			modelReq.EndDate = &d
+		}
+	}
+	if req.Salary != nil {
+		modelReq.Salary = req.Salary
+	}
+	if req.Notes != nil {
+		modelReq.Notes = req.Notes
+	}
+
+	if _, err := s.repo.UpdateContract(ctx, nil, contractID, modelReq); err != nil {
+		return dto.ContractResponse{}, err
+	}
+
+	return s.repo.GetContractByID(ctx, nil, contractID)
+}
+
+func (s *employeeService) DeleteContract(ctx context.Context, contractID string) error {
+	return s.repo.DeleteContract(ctx, nil, contractID)
 }

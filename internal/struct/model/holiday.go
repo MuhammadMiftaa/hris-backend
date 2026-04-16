@@ -9,8 +9,10 @@ import (
 type HolidayTypeEnum string
 
 const (
-	HolidayNational HolidayTypeEnum = "national"
-	HolidayCompany  HolidayTypeEnum = "company"
+	HolidayNational   HolidayTypeEnum = "national"
+	HolidayJoint      HolidayTypeEnum = "joint"
+	HolidayObservance HolidayTypeEnum = "observance"
+	HolidayCompany    HolidayTypeEnum = "company"
 )
 
 type Holiday struct {

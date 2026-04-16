@@ -159,28 +159,92 @@ func (h *EmployeeHandler) ResetPassword(c *fiber.Ctx) error {
 
 // Contacts
 func (h *EmployeeHandler) ListContacts(c *fiber.Ctx) error {
-	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contact list", Data: []any{}})
+	id := c.Params("id")
+	result, err := h.service.GetContactsByEmployeeID(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
+	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contact list", Data: result})
 }
+
 func (h *EmployeeHandler) CreateContact(c *fiber.Ctx) error {
-	return c.JSON(dto.APIResponse{Status: true, StatusCode: 201, Message: "Contact created", Data: map[string]any{}})
+	id := c.Params("id")
+	var req dto.CreateContactRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{Status: false, StatusCode: 400, Message: err.Error()})
+	}
+
+	result, err := h.service.CreateContact(c.Context(), id, req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(dto.APIResponse{Status: true, StatusCode: 201, Message: "Contact created", Data: result})
 }
+
 func (h *EmployeeHandler) UpdateContact(c *fiber.Ctx) error {
-	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contact updated", Data: map[string]any{}})
+	id := c.Params("id")
+	var req dto.UpdateContactRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{Status: false, StatusCode: 400, Message: err.Error()})
+	}
+
+	result, err := h.service.UpdateContact(c.Context(), id, req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
+	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contact updated", Data: result})
 }
+
 func (h *EmployeeHandler) DeleteContact(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if err := h.service.DeleteContact(c.Context(), id); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contact deleted"})
 }
 
 // Contracts
 func (h *EmployeeHandler) ListContracts(c *fiber.Ctx) error {
-	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contract list", Data: []any{}})
+	id := c.Params("id")
+	result, err := h.service.GetContractsByEmployeeID(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
+	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contract list", Data: result})
 }
+
 func (h *EmployeeHandler) CreateContract(c *fiber.Ctx) error {
-	return c.JSON(dto.APIResponse{Status: true, StatusCode: 201, Message: "Contract created", Data: map[string]any{}})
+	id := c.Params("id")
+	var req dto.CreateContractRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{Status: false, StatusCode: 400, Message: err.Error()})
+	}
+
+	result, err := h.service.CreateContract(c.Context(), id, req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(dto.APIResponse{Status: true, StatusCode: 201, Message: "Contract created", Data: result})
 }
+
 func (h *EmployeeHandler) UpdateContract(c *fiber.Ctx) error {
-	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contract updated", Data: map[string]any{}})
+	id := c.Params("id")
+	var req dto.UpdateContractRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{Status: false, StatusCode: 400, Message: err.Error()})
+	}
+
+	result, err := h.service.UpdateContract(c.Context(), id, req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
+	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contract updated", Data: result})
 }
+
 func (h *EmployeeHandler) DeleteContract(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if err := h.service.DeleteContract(c.Context(), id); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{Status: false, StatusCode: 500, Message: err.Error()})
+	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Contract deleted"})
 }
