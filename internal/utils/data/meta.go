@@ -141,28 +141,41 @@ var (
 	}
 
 	PermissionModuleMeta = []dto.Meta{
-		{ID: "dashboard", Name: "Dashboard"},
+		{ID: "home", Name: "Home"},
 		{ID: "employee", Name: "Pegawai"},
 		{ID: "branch", Name: "Cabang"},
 		{ID: "department", Name: "Departemen"},
-		{ID: "position", Name: "Jabatan"},
+		{ID: "job_position", Name: "Jabatan"},
 		{ID: "role", Name: "Role"},
-		{ID: "leave_type", Name: "Tipe Cuti"},
-		{ID: "shift", Name: "Shift"},
+		{ID: "leave_type", Name: "Jenis Cuti"},
+		{ID: "template_shift", Name: "Template Shift"},
+		{ID: "schedule", Name: "Jadwal Pegawai"},
 		{ID: "holiday", Name: "Hari Libur"},
-		{ID: "attendance", Name: "Kehadiran"},
+		{ID: "attendance", Name: "Presensi"},
+		{ID: "attendance_adjustment", Name: "Koreksi Presensi"},
 		{ID: "leave", Name: "Cuti"},
+		{ID: "leave_balance", Name: "Saldo Cuti"},
 		{ID: "request", Name: "Pengajuan"},
+		{ID: "business_trip", Name: "Tugas"},
+		{ID: "overtime", Name: "Lembur"},
 		{ID: "daily_report", Name: "RKH"},
 		{ID: "mutabaah", Name: "Mutabaah"},
+		{ID: "profile", Name: "Profile"},
 	}
 
 	PermissionActionMeta = []dto.Meta{
 		{ID: "read", Name: "Lihat"},
+		{ID: "employee_read", Name: "Lihat Khusus Pegawai"},
+		{ID: "admin_read", Name: "Lihat Khusus Admin"},
 		{ID: "create", Name: "Tambah"},
 		{ID: "update", Name: "Edit"},
 		{ID: "delete", Name: "Hapus"},
 		{ID: "approve", Name: "Approve"},
+		{ID: "leader_approve", Name: "Approve Leader"},
+		{ID: "hr_approve", Name: "Approve HR"},
+		{ID: "clock_in", Name: "Clock In"},
+		{ID: "clock_out", Name: "Clock Out"},
+		{ID: "reset_password", Name: "Reset Password"},
 	}
 
 	AttendanceStatusMeta = []dto.Meta{

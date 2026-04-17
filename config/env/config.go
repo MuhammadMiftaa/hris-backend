@@ -10,7 +10,6 @@ type (
 	Server struct {
 		Mode      string `env:"MODE"`
 		HTTPPort  string `env:"HTTP_PORT"`
-		JWTSecret string `env:"JWT_SECRET"`
 		ClientURL string `env:"CLIENT_URL"`
 	}
 
@@ -66,7 +65,6 @@ func LoadNative() ([]string, error) {
 
 	lookupEnv("MODE", &Cfg.Server.Mode, &missing)
 	lookupEnv("HTTP_PORT", &Cfg.Server.HTTPPort, &missing)
-	lookupEnv("JWT_SECRET", &Cfg.Server.JWTSecret, &missing)
 	lookupEnv("CLIENT_URL", &Cfg.Server.ClientURL, &missing)
 
 	lookupEnv("DB_USER", &Cfg.Database.DBUser, &missing)

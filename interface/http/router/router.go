@@ -70,6 +70,7 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, mi
 	route.OvertimeRoutes(app, dbInstance.GetDB())
 	route.DailyReportRoutes(app, dbInstance.GetDB())
 	route.DashboardRoutes(app, dbInstance.GetDB())
+	route.ProfileRoutes(app, dbInstance.GetDB(), minioClient)
 
 	return app
 }

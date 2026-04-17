@@ -50,4 +50,6 @@ const (
 	PERM_MutabaahRead      = "mutabaah-read"
 	PERM_MutabaahCreate    = "mutabaah-create"
 	PERM_MutabaahUpdate    = "mutabaah-update"
+	PERM_ProfileRead       = "profile-read"
+	PERM_ProfileUpdate     = "profile-update"
 )

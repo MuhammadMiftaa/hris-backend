@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -114,3 +116,27 @@ func ParseTimeString(t string, date string) (time.Time, error) {
 	}
 	return parsed, nil
 }
+
+// UploadToPresignedURL performs an HTTP PUT to a presigned MinIO URL with the given data.
+// Used for server-side uploads (e.g., profile photo from base64 payload).
+func UploadToPresignedURL(presignedURL string, data []byte, contentType string) error {
+	req, err := http.NewRequest(http.MethodPut, presignedURL, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	req.ContentLength = int64(len(data))
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("upload request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("upload failed with status %d", resp.StatusCode)
+	}
+	return nil
+}
+
