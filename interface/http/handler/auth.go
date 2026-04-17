@@ -20,11 +20,7 @@ func NewAuthHandler(service service.AuthService) *AuthHandler {
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req dto.LoginReq
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    "invalid request",
-		})
+		return respondBadRequest(c, "invalid request")
 	}
 
 	result, err := h.service.Login(c.Context(), req)
@@ -50,11 +46,7 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.RefreshToken == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    "refresh_token is required",
-		})
+		return respondBadRequest(c, "refresh_token is required")
 	}
 
 	result, err := h.service.Refresh(c.Context(), req.RefreshToken)

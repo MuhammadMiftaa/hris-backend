@@ -20,9 +20,7 @@ func NewHolidayHandler(service service.HolidayService) *HolidayHandler {
 func (h *HolidayHandler) Metadata(c *fiber.Ctx) error {
 	result, err := h.service.GetMetadata(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status: false, StatusCode: 500, Message: err.Error(),
-		})
+		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Holiday metadata", Data: result})
 }
@@ -43,9 +41,7 @@ func (h *HolidayHandler) List(c *fiber.Ctx) error {
 
 	result, err := h.service.GetAllHolidays(c.Context(), &params)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status: false, StatusCode: 500, Message: err.Error(),
-		})
+		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Holiday list", Data: result})
 }
@@ -53,15 +49,11 @@ func (h *HolidayHandler) List(c *fiber.Ctx) error {
 func (h *HolidayHandler) Detail(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status: false, StatusCode: 400, Message: "Invalid ID",
-		})
+		return respondBadRequest(c, "Invalid ID")
 	}
 	result, err := h.service.GetHolidayByID(c.Context(), uint(id))
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status: false, StatusCode: 500, Message: err.Error(),
-		})
+		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Holiday detail", Data: result})
 }
@@ -69,15 +61,11 @@ func (h *HolidayHandler) Detail(c *fiber.Ctx) error {
 func (h *HolidayHandler) Create(c *fiber.Ctx) error {
 	var input dto.CreateHolidayRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status: false, StatusCode: 400, Message: err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 	result, err := h.service.CreateHoliday(c.Context(), input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status: false, StatusCode: 500, Message: err.Error(),
-		})
+		return respondError(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(dto.APIResponse{
 		Status: true, StatusCode: 201, Message: "Holiday created", Data: result,
@@ -87,21 +75,15 @@ func (h *HolidayHandler) Create(c *fiber.Ctx) error {
 func (h *HolidayHandler) Update(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status: false, StatusCode: 400, Message: "Invalid ID",
-		})
+		return respondBadRequest(c, "Invalid ID")
 	}
 	var input dto.UpdateHolidayRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status: false, StatusCode: 400, Message: err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 	result, err := h.service.UpdateHoliday(c.Context(), uint(id), input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status: false, StatusCode: 500, Message: err.Error(),
-		})
+		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Holiday updated", Data: result})
 }
@@ -109,14 +91,10 @@ func (h *HolidayHandler) Update(c *fiber.Ctx) error {
 func (h *HolidayHandler) Delete(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status: false, StatusCode: 400, Message: "Invalid ID",
-		})
+		return respondBadRequest(c, "Invalid ID")
 	}
 	if err := h.service.DeleteHoliday(c.Context(), uint(id)); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status: false, StatusCode: 500, Message: err.Error(),
-		})
+		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Holiday deleted"})
 }

@@ -18,11 +18,7 @@ func NewDepartmentHandler(service service.DepartmentService) *DepartmentHandler 
 func (h *DepartmentHandler) Metadata(c *fiber.Ctx) error {
 	result, err := h.service.GetMetadata(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -36,20 +32,12 @@ func (h *DepartmentHandler) Metadata(c *fiber.Ctx) error {
 func (h *DepartmentHandler) List(c *fiber.Ctx) error {
 	var params dto.DepartmentListParams
 	if err := c.QueryParser(&params); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	result, err := h.service.GetAllDepartments(c.Context(), params)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -64,11 +52,7 @@ func (h *DepartmentHandler) Detail(c *fiber.Ctx) error {
 	id := c.Params("id")
 	result, err := h.service.GetDepartmentByID(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -82,20 +66,12 @@ func (h *DepartmentHandler) Detail(c *fiber.Ctx) error {
 func (h *DepartmentHandler) Create(c *fiber.Ctx) error {
 	var input dto.CreateDepartmentRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	result, err := h.service.CreateDepartment(c.Context(), input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -109,21 +85,13 @@ func (h *DepartmentHandler) Create(c *fiber.Ctx) error {
 func (h *DepartmentHandler) Update(c *fiber.Ctx) error {
 	var input dto.UpdateDepartmentRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	id := c.Params("id")
 	result, err := h.service.UpdateDepartment(c.Context(), id, input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -138,11 +106,7 @@ func (h *DepartmentHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	err := h.service.DeleteDepartment(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{

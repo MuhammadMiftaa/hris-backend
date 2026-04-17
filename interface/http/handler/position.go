@@ -20,11 +20,7 @@ func NewPositionHandler(service service.PositionService) *PositionHandler {
 func (h *PositionHandler) Metadata(c *fiber.Ctx) error {
 	result, err := h.service.GetMetadata(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -47,11 +43,7 @@ func (h *PositionHandler) List(c *fiber.Ctx) error {
 
 	result, err := h.service.GetAllPositions(c.Context(), departmentID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -65,20 +57,12 @@ func (h *PositionHandler) List(c *fiber.Ctx) error {
 func (h *PositionHandler) Create(c *fiber.Ctx) error {
 	var input dto.CreatePositionRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	result, err := h.service.CreatePosition(c.Context(), input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -92,21 +76,13 @@ func (h *PositionHandler) Create(c *fiber.Ctx) error {
 func (h *PositionHandler) Update(c *fiber.Ctx) error {
 	var input dto.UpdatePositionRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	id := c.Params("id")
 	result, err := h.service.UpdatePosition(c.Context(), id, input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -121,11 +97,7 @@ func (h *PositionHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	err := h.service.DeletePosition(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{

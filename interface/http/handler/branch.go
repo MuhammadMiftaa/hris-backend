@@ -18,11 +18,7 @@ func NewBranchHandler(service service.BranchService) *BranchHandler {
 func (h *BranchHandler) List(c *fiber.Ctx) error {
 	result, err := h.service.GetAllBranches(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -37,11 +33,7 @@ func (h *BranchHandler) Detail(c *fiber.Ctx) error {
 	id := c.Params("id")
 	result, err := h.service.GetBranchByID(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -55,20 +47,12 @@ func (h *BranchHandler) Detail(c *fiber.Ctx) error {
 func (h *BranchHandler) Create(c *fiber.Ctx) error {
 	var input dto.CreateBranchRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	result, err := h.service.CreateBranch(c.Context(), input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -82,21 +66,13 @@ func (h *BranchHandler) Create(c *fiber.Ctx) error {
 func (h *BranchHandler) Update(c *fiber.Ctx) error {
 	var input dto.UpdateBranchRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	id := c.Params("id")
 	result, err := h.service.UpdateBranch(c.Context(), id, input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -111,11 +87,7 @@ func (h *BranchHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	err := h.service.DeleteBranch(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{

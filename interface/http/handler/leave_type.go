@@ -29,11 +29,7 @@ func (h *LeaveTypeHandler) Metadata(c *fiber.Ctx) error {
 func (h *LeaveTypeHandler) List(c *fiber.Ctx) error {
 	result, err := h.service.GetAllLeaveTypes(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -48,11 +44,7 @@ func (h *LeaveTypeHandler) Detail(c *fiber.Ctx) error {
 	id := c.Params("id")
 	result, err := h.service.GetLeaveTypeByID(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -66,20 +58,12 @@ func (h *LeaveTypeHandler) Detail(c *fiber.Ctx) error {
 func (h *LeaveTypeHandler) Create(c *fiber.Ctx) error {
 	var input dto.CreateLeaveTypeRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	result, err := h.service.CreateLeaveType(c.Context(), input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -93,21 +77,13 @@ func (h *LeaveTypeHandler) Create(c *fiber.Ctx) error {
 func (h *LeaveTypeHandler) Update(c *fiber.Ctx) error {
 	var input dto.UpdateLeaveTypeRequest
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusBadRequest,
-			Message:    err.Error(),
-		})
+		return respondBadRequest(c, err.Error())
 	}
 
 	id := c.Params("id")
 	result, err := h.service.UpdateLeaveType(c.Context(), id, input)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
@@ -122,11 +98,7 @@ func (h *LeaveTypeHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	err := h.service.DeleteLeaveType(c.Context(), id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.APIResponse{
-			Status:     false,
-			StatusCode: fiber.StatusInternalServerError,
-			Message:    err.Error(),
-		})
+		return respondError(c, err)
 	}
 
 	return c.JSON(dto.APIResponse{
