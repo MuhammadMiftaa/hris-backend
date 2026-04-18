@@ -4,6 +4,15 @@ import "time"
 
 // ── Shift Template ──────────────────────────────────────
 
+type ShiftTemplateRow struct {
+	ID         uint       `gorm:"column:id"`
+	Name       string     `gorm:"column:name"`
+	IsFlexible bool       `gorm:"column:is_flexible"`
+	CreatedAt  time.Time  `gorm:"column:created_at"`
+	UpdatedAt  *time.Time `gorm:"column:updated_at"`
+	DeletedAt  *time.Time `gorm:"column:deleted_at"`
+}
+
 type ShiftTemplateResponse struct {
 	ID         uint                       `json:"id"`
 	Name       string                     `json:"name"`

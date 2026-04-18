@@ -65,57 +65,34 @@ func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transacti
 		return nil, err
 	}
 
-	var templates []struct {
-		ID         uint       `db:"id"`
-		Name       string     `db:"name"`
-		IsFlexible bool       `db:"is_flexible"`
-		CreatedAt  interface{} `db:"created_at"`
-		UpdatedAt  *interface{} `db:"updated_at"`
-		DeletedAt  *interface{} `db:"deleted_at"`
-	}
-
-	rows, err := db.Raw(`
-		SELECT id, name, is_flexible, created_at, updated_at, deleted_at
-		FROM shift_templates
-		WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
-	`).Rows()
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// Scan templates
-	var rawTemplates []dto.ShiftTemplateResponse
-	type rawTemplate struct {
-		ID         uint
-		Name       string
-		IsFlexible bool
-		CreatedAt  interface{}
-		UpdatedAt  *interface{}
-		DeletedAt  *interface{}
-	}
-	_ = templates
-
+	var rows []dto.ShiftTemplateRow
 	if err := db.Raw(`
 		SELECT id, name, is_flexible, created_at, updated_at, deleted_at
 		FROM shift_templates
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
-	`).Scan(&rawTemplates).Error; err != nil {
+	`).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
-	// For each template, fetch details
-	for i, tmpl := range rawTemplates {
-		details, err := r.GetDetailsByTemplateID(ctx, tx, tmpl.ID)
+	result := make([]dto.ShiftTemplateResponse, 0, len(rows))
+	for _, row := range rows {
+		details, err := r.GetDetailsByTemplateID(ctx, tx, row.ID)
 		if err != nil {
-			return nil, fmt.Errorf("get details for template %d: %w", tmpl.ID, err)
+			return nil, fmt.Errorf("get details for template %d: %w", row.ID, err)
 		}
-		rawTemplates[i].Details = details
+		result = append(result, dto.ShiftTemplateResponse{
+			ID:         row.ID,
+			Name:       row.Name,
+			IsFlexible: row.IsFlexible,
+			Details:    details,
+			CreatedAt:  row.CreatedAt,
+			UpdatedAt:  row.UpdatedAt,
+			DeletedAt:  row.DeletedAt,
+		})
 	}
 
-	return rawTemplates, nil
+	return result, nil
 }
 
 func (r *shiftRepository) GetShiftTemplateByID(ctx context.Context, tx Transaction, id uint) (dto.ShiftTemplateResponse, error) {
@@ -124,15 +101,15 @@ func (r *shiftRepository) GetShiftTemplateByID(ctx context.Context, tx Transacti
 		return dto.ShiftTemplateResponse{}, err
 	}
 
-	var tmpl dto.ShiftTemplateResponse
+	var row dto.ShiftTemplateRow
 	if err := db.Raw(`
 		SELECT id, name, is_flexible, created_at, updated_at, deleted_at
 		FROM shift_templates
 		WHERE deleted_at IS NULL AND id = ?
-	`, id).Scan(&tmpl).Error; err != nil {
+	`, id).Scan(&row).Error; err != nil {
 		return dto.ShiftTemplateResponse{}, err
 	}
-	if tmpl.ID == 0 {
+	if row.ID == 0 {
 		return dto.ShiftTemplateResponse{}, fmt.Errorf("shift template not found")
 	}
 
@@ -140,9 +117,16 @@ func (r *shiftRepository) GetShiftTemplateByID(ctx context.Context, tx Transacti
 	if err != nil {
 		return dto.ShiftTemplateResponse{}, fmt.Errorf("get details: %w", err)
 	}
-	tmpl.Details = details
 
-	return tmpl, nil
+	return dto.ShiftTemplateResponse{
+		ID:         row.ID,
+		Name:       row.Name,
+		IsFlexible: row.IsFlexible,
+		Details:    details,
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
+		DeletedAt:  row.DeletedAt,
+	}, nil
 }
 
 func (r *shiftRepository) CreateShiftTemplate(ctx context.Context, tx Transaction, m model.ShiftTemplate) (model.ShiftTemplate, error) {
@@ -512,4 +496,3 @@ func (r *shiftRepository) GetApprovedLeave(ctx context.Context, tx Transaction, 
 	}
 	return &id, nil
 }
-
