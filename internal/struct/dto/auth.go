@@ -28,6 +28,7 @@ type GetAccountByEmailResponse struct {
 
 type GetEmployeeByIDResponse struct {
 	AccountID      uint           `json:"account_id" gorm:"column:account_id"`
+	EmployeeID     uint           `json:"employee_id" gorm:"column:employee_id"`
 	Email          string         `json:"email" gorm:"column:email"`
 	IsActive       bool           `json:"is_active" gorm:"column:is_active"`
 	LastLoginAt    *time.Time     `json:"last_login_at" gorm:"column:last_login_at"`

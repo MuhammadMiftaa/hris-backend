@@ -28,7 +28,7 @@ func (h *AttendanceHandler) PresignClockPhoto(c *fiber.Ctx) error {
 		return respondBadRequest(c, "action is required")
 	}
 
-	result, err := h.service.PresignClockPhoto(c.Context(), account.AccountID, req.Action)
+	result, err := h.service.PresignClockPhoto(c.Context(), account.EmployeeID, req.Action)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -65,7 +65,7 @@ func (h *AttendanceHandler) GetPhotoURL(c *fiber.Ctx) error {
 func (h *AttendanceHandler) GetTodayStatus(c *fiber.Ctx) error {
 	account := getAccountFromCtx(c)
 
-	result, err := h.service.GetTodayStatus(c.Context(), account.AccountID)
+	result, err := h.service.GetTodayStatus(c.Context(), account.EmployeeID)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -93,7 +93,7 @@ func (h *AttendanceHandler) ClockIn(c *fiber.Ctx) error {
 		return respondBadRequest(c, "latitude dan longitude harus diisi")
 	}
 
-	result, err := h.service.ClockIn(c.Context(), account.AccountID, req)
+	result, err := h.service.ClockIn(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -118,7 +118,7 @@ func (h *AttendanceHandler) ClockOut(c *fiber.Ctx) error {
 		return respondBadRequest(c, "photo_key is required")
 	}
 
-	result, err := h.service.ClockOut(c.Context(), account.AccountID, req)
+	result, err := h.service.ClockOut(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -172,7 +172,7 @@ func (h *AttendanceHandler) CreateManual(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.CreateManualAttendance(c.Context(), account.AccountID, req)
+	res, err := h.service.CreateManualAttendance(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -230,7 +230,7 @@ func (h *AttendanceHandler) CreateOverride(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.CreateOverride(c.Context(), account.AccountID, req)
+	res, err := h.service.CreateOverride(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -255,7 +255,7 @@ func (h *AttendanceHandler) UpdateOverride(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.UpdateOverrideStatus(c.Context(), account.AccountID, uint(id), req)
+	res, err := h.service.UpdateOverrideStatus(c.Context(), account.EmployeeID, uint(id), req)
 	if err != nil {
 		return respondError(c, err)
 	}

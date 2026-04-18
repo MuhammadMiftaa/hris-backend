@@ -55,14 +55,14 @@ func (r *businessTripRepository) GetAll(ctx context.Context, tx Transaction, par
 			b.purpose,
 			b.document_url,
 			b.status,
-			b.approver_id,
+			b.approved_by AS approver_id,
 			a.full_name AS approver_name,
 			b.approver_notes,
 			b.created_at,
 			b.updated_at
 		FROM business_trip_requests b
 		JOIN employees e ON e.id = b.employee_id
-		LEFT JOIN employees a ON a.id = b.approver_id
+		LEFT JOIN employees a ON a.id = b.approved_by
 		WHERE b.deleted_at IS NULL
 	`
 	args := []interface{}{}
@@ -110,14 +110,14 @@ func (r *businessTripRepository) GetByID(ctx context.Context, tx Transaction, id
 			b.purpose,
 			b.document_url,
 			b.status,
-			b.approver_id,
+			b.approved_by AS approver_id,
 			a.full_name AS approver_name,
 			b.approver_notes,
 			b.created_at,
 			b.updated_at
 		FROM business_trip_requests b
 		JOIN employees e ON e.id = b.employee_id
-		LEFT JOIN employees a ON a.id = b.approver_id
+		LEFT JOIN employees a ON a.id = b.approved_by
 		WHERE b.id = ? AND b.deleted_at IS NULL
 	`
 	if err := db.Raw(query, id).Scan(&res).Error; err != nil {
@@ -147,7 +147,7 @@ func (r *businessTripRepository) UpdateStatus(ctx context.Context, tx Transactio
 	}
 	upd := map[string]interface{}{
 		"status":         status,
-		"approver_id":    approverID,
+		"approved_by":    approverID,
 		"approver_notes": notes,
 	}
 	return db.Model(&model.BusinessTripRequest{}).Where("id = ?", id).Updates(upd).Error

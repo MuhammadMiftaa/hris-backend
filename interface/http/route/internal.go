@@ -22,6 +22,13 @@ func InternalRoutes(app *fiber.App, db *gorm.DB) {
 
 	internal := app.Group("/internal")
 	{
+		// cron := internal.Group("/cron", func(c *fiber.Ctx) error {
+		// 	secret := c.Get("X-Cron-Secret")
+		// 	if secret == "" || secret != os.Getenv("CRON_SECRET_KEY") {
+		// 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized cron request"})
+		// 	}
+		// 	return c.Next()
+		// })
 		cron := internal.Group("/cron")
 		cron.Post("/absent-mark", cronH.TriggerAbsentMark)
 		cron.Post("/mutabaah-mark", cronH.TriggerMutabaahMark)

@@ -29,7 +29,7 @@ func LeaveRoutes(app *fiber.App, db *gorm.DB) {
 	{
 		requests.Get("/", middleware.RBACMiddleware(data.PERM_LeaveRead), h.ListRequests)
 		requests.Get("/:id", middleware.RBACMiddleware(data.PERM_LeaveRead), h.DetailRequest)
-		requests.Post("/", h.Create) // Pegawai apply themselves
+		requests.Post("/", middleware.RBACMiddleware(data.PERM_LeaveCreate), h.Create)
 		requests.Put("/:id/approve", middleware.RBACMiddleware(data.PERM_LeaveUpdate), h.Approve)
 		requests.Put("/:id/reject", middleware.RBACMiddleware(data.PERM_LeaveUpdate), h.Reject)
 	}

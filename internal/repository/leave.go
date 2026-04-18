@@ -74,10 +74,10 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 			b.year,
 			b.used_occurrences,
 			b.used_duration,
-			b.max_occurrences,
-			b.max_duration,
-			(b.max_occurrences - b.used_occurrences) AS remaining_occurrences,
-			(b.max_duration - b.used_duration) AS remaining_duration,
+			t.max_occurrences_per_year AS max_occurrences,
+			t.max_total_duration_per_year AS max_duration,
+			(t.max_occurrences_per_year - b.used_occurrences) AS remaining_occurrences,
+			(t.max_total_duration_per_year - b.used_duration) AS remaining_duration,
 			b.created_at,
 			b.updated_at
 		FROM leave_balances b
@@ -120,10 +120,10 @@ func (r *leaveRepository) GetBalanceByEmployeeAndType(ctx context.Context, tx Tr
 			b.year,
 			b.used_occurrences,
 			b.used_duration,
-			b.max_occurrences,
-			b.max_duration,
-			(b.max_occurrences - b.used_occurrences) AS remaining_occurrences,
-			(b.max_duration - b.used_duration) AS remaining_duration,
+			t.max_occurrences_per_year AS max_occurrences,
+			t.max_total_duration_per_year AS max_duration,
+			(t.max_occurrences_per_year - b.used_occurrences) AS remaining_occurrences,
+			(t.max_total_duration_per_year - b.used_duration) AS remaining_duration,
 			b.created_at,
 			b.updated_at
 		FROM leave_balances b

@@ -18,9 +18,9 @@ func PositionRoutes(app *fiber.App, db *gorm.DB) {
 	positions := app.Group("/positions")
 	{
 		positions.Get("/metadata", h.Metadata)
-		positions.Get("/", middleware.RBACMiddleware(data.PERM_PositionRead), h.List)
-		positions.Post("/", middleware.RBACMiddleware(data.PERM_PositionCreate), h.Create)
-		positions.Put("/:id", middleware.RBACMiddleware(data.PERM_PositionUpdate), h.Update)
-		positions.Delete("/:id", middleware.RBACMiddleware(data.PERM_PositionDelete), h.Delete)
+		positions.Get("/", middleware.RBACMiddleware(data.PERM_JobPositionRead), h.List)
+		positions.Post("/", middleware.RBACMiddleware(data.PERM_JobPositionCreate), h.Create)
+		positions.Put("/:id", middleware.RBACMiddleware(data.PERM_JobPositionUpdate), h.Update)
+		positions.Delete("/:id", middleware.RBACMiddleware(data.PERM_JobPositionDelete), h.Delete)
 	}
 }

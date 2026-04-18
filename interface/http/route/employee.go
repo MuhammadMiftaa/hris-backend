@@ -36,8 +36,8 @@ func EmployeeRoutes(app *fiber.App, db *gorm.DB) {
 	}
 
 	app.Put("/employee-contacts/:id", middleware.RBACMiddleware(data.PERM_EmployeeUpdate), h.UpdateContact)
-	app.Delete("/employee-contacts/:id", middleware.RBACMiddleware(data.PERM_EmployeeDelete), h.DeleteContact)
+	app.Delete("/employee-contacts/:id", middleware.RBACMiddleware(data.PERM_EmployeeUpdate), h.DeleteContact)
 
 	app.Put("/contracts/:id", middleware.RBACMiddleware(data.PERM_EmployeeUpdate), h.UpdateContract)
-	app.Delete("/contracts/:id", middleware.RBACMiddleware(data.PERM_EmployeeDelete), h.DeleteContract)
+	app.Delete("/contracts/:id", middleware.RBACMiddleware(data.PERM_EmployeeUpdate), h.DeleteContract)
 }

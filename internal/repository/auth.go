@@ -74,6 +74,7 @@ func (r *authRepository) GetEmployeeByID(ctx context.Context, tx Transaction, id
 	err = db.Raw(`
         SELECT 
             a.id AS account_id,
+            e.id AS employee_id,
             COALESCE(a.email, '') AS email,
             COALESCE(a.is_active, false) AS is_active,
             COALESCE(a.last_login_at, NULL) AS last_login_at,

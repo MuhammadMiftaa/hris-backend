@@ -284,7 +284,7 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 			st.id                              AS shift_template_id,
 			st.name                            AS shift_name,
 			st.is_flexible,
-			LOWER(TO_CHAR($2::DATE, 'Day'))    AS day_of_week,
+			LOWER(TRIM(TO_CHAR($2::DATE, 'Day'))) AS day_of_week,
 			COALESCE(std.is_working_day, TRUE) AS is_working_day,
 			std.clock_in_start::TEXT           AS clock_in_start,
 			std.clock_in_end::TEXT             AS clock_in_end,

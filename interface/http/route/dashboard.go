@@ -21,9 +21,9 @@ func DashboardRoutes(app *fiber.App, db *gorm.DB) {
 	dashboard := app.Group("/dashboard")
 	{
 		// /dashboard/employee
-		dashboard.Get("/employee", h.GetEmployeeDashboard)
+		dashboard.Get("/employee", middleware.RBACMiddleware(data.PERM_HomeEmployeeRead), h.GetEmployeeDashboard)
 
 		// /dashboard/hrd
-		dashboard.Get("/hrd", middleware.RBACMiddleware(data.PERM_DashboardRead), h.GetHRDDashboard)
+		dashboard.Get("/hrd", middleware.RBACMiddleware(data.PERM_HomeAdminRead), h.GetHRDDashboard)
 	}
 }

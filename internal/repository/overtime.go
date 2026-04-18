@@ -49,18 +49,18 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 			o.id,
 			o.employee_id,
 			e.full_name AS employee_name,
-			o.date::TEXT AS date,
-			o.duration_minutes,
+			o.overtime_date::TEXT AS date,
+			o.planned_minutes,
 			o.reason,
 			o.status,
-			o.approver_id,
+			o.approved_by AS approver_id,
 			a.full_name AS approver_name,
 			o.approver_notes,
 			o.created_at,
 			o.updated_at
 		FROM overtime_requests o
 		JOIN employees e ON e.id = o.employee_id
-		LEFT JOIN employees a ON a.id = o.approver_id
+		LEFT JOIN employees a ON a.id = o.approved_by
 		WHERE o.deleted_at IS NULL
 	`
 	args := []interface{}{}
@@ -74,11 +74,11 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 		args = append(args, *params.Status)
 	}
 	if params.StartDate != nil {
-		query += " AND o.date >= ?::DATE"
+		query += " AND o.overtime_date >= ?::DATE"
 		args = append(args, *params.StartDate)
 	}
 	if params.EndDate != nil {
-		query += " AND o.date <= ?::DATE"
+		query += " AND o.overtime_date <= ?::DATE"
 		args = append(args, *params.EndDate)
 	}
 	query += " ORDER BY o.created_at DESC"
@@ -102,18 +102,18 @@ func (r *overtimeRepository) GetByID(ctx context.Context, tx Transaction, id uin
 			o.id,
 			o.employee_id,
 			e.full_name AS employee_name,
-			o.date::TEXT AS date,
-			o.duration_minutes,
+			o.overtime_date::TEXT AS date,
+			o.planned_minutes,
 			o.reason,
 			o.status,
-			o.approver_id,
+			o.approved_by AS approver_id,
 			a.full_name AS approver_name,
 			o.approver_notes,
 			o.created_at,
 			o.updated_at
 		FROM overtime_requests o
 		JOIN employees e ON e.id = o.employee_id
-		LEFT JOIN employees a ON a.id = o.approver_id
+		LEFT JOIN employees a ON a.id = o.approved_by
 		WHERE o.id = ? AND o.deleted_at IS NULL
 	`
 	if err := db.Raw(query, id).Scan(&res).Error; err != nil {

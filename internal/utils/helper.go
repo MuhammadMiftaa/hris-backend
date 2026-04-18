@@ -106,15 +106,14 @@ func HaversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
 // parseTimeString parse "HH:MM:SS" menjadi time.Time di tanggal yang diberikan
 func ParseTimeString(t string, date string) (time.Time, error) {
 	combined := fmt.Sprintf("%s %s", date, t)
-	parsed, err := time.ParseInLocation("2006-01-02 15:04:05", combined, time.Local)
-	if err != nil {
-		// coba format HH:MM
-		parsed, err = time.ParseInLocation("2006-01-02 15:04", combined[:len(date)+6], time.Local)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("parse time %q: %w", t, err)
-		}
+	if parsed, err := time.ParseInLocation("2006-01-02 15:04:05", combined, time.Local); err == nil {
+		return parsed, nil
 	}
-	return parsed, nil
+	shortCombined := fmt.Sprintf("%s %s", date, t)
+	if parsed, err := time.ParseInLocation("2006-01-02 15:04", shortCombined, time.Local); err == nil {
+		return parsed, nil
+	}
+	return time.Time{}, fmt.Errorf("parseTimeString: format tidak dikenali untuk %q", t)
 }
 
 // UploadToPresignedURL performs an HTTP PUT to a presigned MinIO URL with the given data.
@@ -139,4 +138,3 @@ func UploadToPresignedURL(presignedURL string, data []byte, contentType string) 
 	}
 	return nil
 }
-

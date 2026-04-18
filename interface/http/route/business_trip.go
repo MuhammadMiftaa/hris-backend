@@ -22,8 +22,8 @@ func BusinessTripRoutes(app *fiber.App, db *gorm.DB) {
 	{
 		trips.Get("/", middleware.RBACMiddleware(data.PERM_RequestRead), h.List)
 		trips.Get("/:id", middleware.RBACMiddleware(data.PERM_RequestRead), h.Detail)
-		trips.Post("/", h.Create) // Dibuat oleh employee sendiri
+		trips.Post("/", middleware.RBACMiddleware(data.PERM_RequestCreate), h.Create)
 		trips.Put("/:id", middleware.RBACMiddleware(data.PERM_RequestUpdate), h.UpdateStatus)
-		trips.Delete("/:id", h.Delete)
+		trips.Delete("/:id", middleware.RBACMiddleware(data.PERM_RequestDelete), h.Delete)
 	}
 }

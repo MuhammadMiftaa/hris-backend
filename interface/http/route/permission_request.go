@@ -23,8 +23,8 @@ func PermissionRequestRoutes(app *fiber.App, db *gorm.DB) {
 		perms.Get("/metadata", h.Metadata)
 		perms.Get("/", middleware.RBACMiddleware(data.PERM_RequestRead), h.List)
 		perms.Get("/:id", middleware.RBACMiddleware(data.PERM_RequestRead), h.Detail)
-		perms.Post("/", h.Create) // Pegawai sendiri
+		perms.Post("/", middleware.RBACMiddleware(data.PERM_RequestCreate), h.Create)
 		perms.Put("/:id", middleware.RBACMiddleware(data.PERM_RequestUpdate), h.UpdateStatus)
-		perms.Delete("/:id", h.Delete)
+		perms.Delete("/:id", middleware.RBACMiddleware(data.PERM_RequestDelete), h.Delete)
 	}
 }

@@ -279,7 +279,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 	logModel := model.AttendanceLog{
 		EmployeeID:            employeeID,
 		ScheduleID:            &shift.ScheduleID,
-		AttendanceDate:        now,
+		AttendanceDate:        time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()),
 		ClockInAt:             &now,
 		ClockInLat:            &req.Latitude,
 		ClockInLng:            &req.Longitude,

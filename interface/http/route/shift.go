@@ -19,20 +19,20 @@ func ShiftRoutes(app *fiber.App, db *gorm.DB) {
 	shifts := app.Group("/shifts")
 	{
 		shifts.Get("/metadata", h.Metadata)
-		shifts.Get("/", middleware.RBACMiddleware(data.PERM_ShiftRead), h.ListTemplates)
-		shifts.Get("/:id", middleware.RBACMiddleware(data.PERM_ShiftRead), h.DetailTemplate)
-		shifts.Post("/", middleware.RBACMiddleware(data.PERM_ShiftCreate), h.CreateTemplate)
-		shifts.Put("/:id", middleware.RBACMiddleware(data.PERM_ShiftUpdate), h.UpdateTemplate)
-		shifts.Delete("/:id", middleware.RBACMiddleware(data.PERM_ShiftDelete), h.DeleteTemplate)
-		shifts.Get("/:id/details", middleware.RBACMiddleware(data.PERM_ShiftRead), h.ListDetails)
+		shifts.Get("/", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ListTemplates)
+		shifts.Get("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.DetailTemplate)
+		shifts.Post("/", middleware.RBACMiddleware(data.PERM_TemplateShiftCreate), h.CreateTemplate)
+		shifts.Put("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftUpdate), h.UpdateTemplate)
+		shifts.Delete("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftDelete), h.DeleteTemplate)
+		shifts.Get("/:id/details", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ListDetails)
 	}
 
 	schedules := app.Group("/schedules")
 	{
-		schedules.Get("/", middleware.RBACMiddleware(data.PERM_ShiftRead), h.ListSchedules)
-		schedules.Get("/:id", middleware.RBACMiddleware(data.PERM_ShiftRead), h.DetailSchedule)
-		schedules.Post("/", middleware.RBACMiddleware(data.PERM_ShiftCreate), h.CreateSchedule)
-		schedules.Put("/:id", middleware.RBACMiddleware(data.PERM_ShiftUpdate), h.UpdateSchedule)
-		schedules.Delete("/:id", middleware.RBACMiddleware(data.PERM_ShiftDelete), h.DeleteSchedule)
+		schedules.Get("/", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ListSchedules)
+		schedules.Get("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.DetailSchedule)
+		schedules.Post("/", middleware.RBACMiddleware(data.PERM_TemplateShiftCreate), h.CreateSchedule)
+		schedules.Put("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftUpdate), h.UpdateSchedule)
+		schedules.Delete("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftDelete), h.DeleteSchedule)
 	}
 }

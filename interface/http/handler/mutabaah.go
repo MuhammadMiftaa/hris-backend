@@ -20,7 +20,7 @@ func NewMutabaahHandler(service service.MutabaahService) *MutabaahHandler {
 func (h *MutabaahHandler) GetTodayStatus(c *fiber.Ctx) error {
 	account := getAccountFromCtx(c)
 
-	result, err := h.service.GetTodayStatus(c.Context(), account.AccountID)
+	result, err := h.service.GetTodayStatus(c.Context(), account.EmployeeID)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -45,7 +45,7 @@ func (h *MutabaahHandler) Submit(c *fiber.Ctx) error {
 		return respondBadRequest(c, "pages tidak boleh negatif")
 	}
 
-	result, err := h.service.Submit(c.Context(), account.AccountID, req)
+	result, err := h.service.Submit(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -62,7 +62,7 @@ func (h *MutabaahHandler) Submit(c *fiber.Ctx) error {
 func (h *MutabaahHandler) Cancel(c *fiber.Ctx) error {
 	account := getAccountFromCtx(c)
 
-	result, err := h.service.Cancel(c.Context(), account.AccountID)
+	result, err := h.service.Cancel(c.Context(), account.EmployeeID)
 	if err != nil {
 		return respondError(c, err)
 	}

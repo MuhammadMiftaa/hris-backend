@@ -22,8 +22,8 @@ func OvertimeRoutes(app *fiber.App, db *gorm.DB) {
 	{
 		ots.Get("/", middleware.RBACMiddleware(data.PERM_RequestRead), h.List)
 		ots.Get("/:id", middleware.RBACMiddleware(data.PERM_RequestRead), h.Detail)
-		ots.Post("/", h.Create) // Dibuat oleh employee sendiri
+		ots.Post("/", middleware.RBACMiddleware(data.PERM_RequestCreate), h.Create)
 		ots.Put("/:id", middleware.RBACMiddleware(data.PERM_RequestUpdate), h.UpdateStatus)
-		ots.Delete("/:id", h.Delete)
+		ots.Delete("/:id", middleware.RBACMiddleware(data.PERM_RequestDelete), h.Delete)
 	}
 }

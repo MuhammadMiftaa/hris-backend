@@ -54,20 +54,20 @@ func (r *permissionRequestRepository) GetAll(ctx context.Context, tx Transaction
 			e.full_name AS employee_name,
 			pr.date::TEXT AS date,
 			pr.permission_type,
-			pr.start_time::TEXT AS start_time,
-			pr.end_time::TEXT AS end_time,
-			pr.duration,
+			pr.leave_time::TEXT AS start_time,
+			pr.return_time::TEXT AS end_time,
+			pr.leave_time - pr.return_time AS duration,
 			pr.reason,
 			pr.document_url,
 			pr.status,
-			pr.approver_id,
+			pr.approved_by AS approver_id,
 			a.full_name AS approver_name,
 			pr.approver_notes,
 			pr.created_at,
 			pr.updated_at
 		FROM permission_requests pr
 		JOIN employees e ON e.id = pr.employee_id
-		LEFT JOIN employees a ON a.id = pr.approver_id
+		LEFT JOIN employees a ON a.id = pr.approved_by
 		WHERE pr.deleted_at IS NULL
 	`
 	args := []interface{}{}
@@ -111,20 +111,20 @@ func (r *permissionRequestRepository) GetByID(ctx context.Context, tx Transactio
 			e.full_name AS employee_name,
 			pr.date::TEXT AS date,
 			pr.permission_type,
-			pr.start_time::TEXT AS start_time,
-			pr.end_time::TEXT AS end_time,
-			pr.duration,
+			pr.leave_time::TEXT AS start_time,
+			pr.return_time::TEXT AS end_time,
+			pr.leave_time - pr.return_time AS duration,
 			pr.reason,
 			pr.document_url,
 			pr.status,
-			pr.approver_id,
+			pr.approved_by AS approver_id,
 			a.full_name AS approver_name,
 			pr.approver_notes,
 			pr.created_at,
 			pr.updated_at
 		FROM permission_requests pr
 		JOIN employees e ON e.id = pr.employee_id
-		LEFT JOIN employees a ON a.id = pr.approver_id
+		LEFT JOIN employees a ON a.id = pr.approved_by
 		WHERE pr.id = ? AND pr.deleted_at IS NULL
 	`
 	if err := db.Raw(query, id).Scan(&res).Error; err != nil {
@@ -154,7 +154,7 @@ func (r *permissionRequestRepository) UpdateStatus(ctx context.Context, tx Trans
 	}
 	upd := map[string]interface{}{
 		"status":         status,
-		"approver_id":    approverID,
+		"approved_by":    approverID,
 		"approver_notes": notes,
 	}
 	return db.Model(&model.PermissionRequest{}).Where("id = ?", id).Updates(upd).Error
