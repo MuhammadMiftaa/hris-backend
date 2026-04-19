@@ -94,7 +94,7 @@ func (h *LeaveHandler) Create(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.CreateRequest(c.Context(), account.AccountID, req)
+	res, err := h.service.CreateRequest(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -120,7 +120,7 @@ func (h *LeaveHandler) Approve(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.ApproveRequest(c.Context(), account.AccountID, uint(id), req)
+	res, err := h.service.ApproveRequest(c.Context(), account.EmployeeID, uint(id), req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -149,7 +149,7 @@ func (h *LeaveHandler) Reject(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.RejectRequest(c.Context(), account.AccountID, uint(id), req)
+	res, err := h.service.RejectRequest(c.Context(), account.EmployeeID, uint(id), req)
 	if err != nil {
 		return respondError(c, err)
 	}

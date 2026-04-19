@@ -10,7 +10,7 @@ import (
 )
 
 type DashboardService interface {
-	GetEmployeeDashboard(ctx context.Context, employeeID uint) (dto.EmployeeDashboardResponse, error)
+	GetEmployeeDashboard(ctx context.Context, accountID uint) (dto.EmployeeDashboardResponse, error)
 	GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error)
 }
 
@@ -37,23 +37,31 @@ func (s *dashboardService) GetEmployeeDashboard(ctx context.Context, employeeID 
 	now := time.Now()
 	year, month, _ := now.Date()
 
-	// 1. Today status (Attendance)
-	attendLog, _ := s.attendRepo.GetTodayLog(ctx, nil, employeeID, today)
-	
-	// 2. Today Mutabaah status
+	// 1. Today attendance status — sesuai kontrak frontend TodayAttendanceStatus
+	todayStatus, _ := s.dashboardRepo.GetTodayAttendanceStatus(ctx, employeeID, today)
+
+	// 2. Today mutabaah status
 	mutabaahLog, _ := s.mutabaahRepo.GetTodayLog(ctx, nil, employeeID, today)
 
-	// 3. Monthly Summary
+	// 3. Monthly summary
 	monthlySummary, _ := s.dashboardRepo.GetMonthlyAttendanceSummary(ctx, employeeID, year, int(month))
 
-	// 4. Leave Balances
+	// 4. Leave balances
 	leaveBalances, _ := s.dashboardRepo.GetLeaveBalanceSummary(ctx, employeeID, year)
 
-	// 5. Pending Requests
+	// 5. Pending requests
 	pendingRequests, _ := s.dashboardRepo.GetPendingRequests(ctx, employeeID)
 
+	// Pastikan slice tidak nil agar JSON menghasilkan [] bukan null
+	if leaveBalances == nil {
+		leaveBalances = []dto.LeaveBalanceSummaryDTO{}
+	}
+	if pendingRequests == nil {
+		pendingRequests = []dto.PendingRequestDTO{}
+	}
+
 	return dto.EmployeeDashboardResponse{
-		Today:           attendLog,
+		Today:           todayStatus,
 		MutabaahToday:   mutabaahLog,
 		MonthlySummary:  monthlySummary,
 		LeaveBalances:   leaveBalances,
@@ -69,7 +77,18 @@ func (s *dashboardService) GetHRDDashboard(ctx context.Context, hrID uint) (dto.
 	teamAttend, _ := s.dashboardRepo.GetTeamAttendanceSummary(ctx, today)
 	teamMutabaah, _ := s.dashboardRepo.GetTeamMutabaahSummary(ctx, today)
 	notClockedIn, _ := s.dashboardRepo.GetNotClockedIn(ctx, today)
-	expiring, _ := s.dashboardRepo.GetExpiringContracts(ctx, 30) // Constraint 30 days
+	expiring, _ := s.dashboardRepo.GetExpiringContracts(ctx, 30)
+
+	// Pastikan slice tidak nil agar JSON menghasilkan [] bukan null
+	if queue == nil {
+		queue = []dto.ApprovalQueueItemDTO{}
+	}
+	if notClockedIn == nil {
+		notClockedIn = []dto.NotClockedInDTO{}
+	}
+	if expiring == nil {
+		expiring = []dto.ExpiringContractDTO{}
+	}
 
 	return dto.HRDDashboardResponse{
 		ApprovalQueue:     queue,

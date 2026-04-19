@@ -75,7 +75,7 @@ func (h *PermissionRequestHandler) Create(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.Create(c.Context(), account.AccountID, req)
+	res, err := h.service.Create(c.Context(), account.EmployeeID, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -101,7 +101,7 @@ func (h *PermissionRequestHandler) UpdateStatus(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.UpdateStatus(c.Context(), account.AccountID, uint(id), req)
+	res, err := h.service.UpdateStatus(c.Context(), account.EmployeeID, uint(id), req)
 	if err != nil {
 		return respondError(c, err)
 	}

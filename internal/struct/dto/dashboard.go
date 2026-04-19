@@ -1,5 +1,14 @@
 package dto
 
+type TodayAttendanceStatus struct {
+	HasClockedIn  bool    `json:"has_clocked_in"`
+	HasClockedOut bool    `json:"has_clocked_out"`
+	ClockInAt     *string `json:"clock_in_at"`
+	ClockOutAt    *string `json:"clock_out_at"`
+	Status        *string `json:"status"`
+	LateMinutes   int     `json:"late_minutes"`
+}
+
 type AttendanceSummaryDTO struct {
 	TotalPresent      int `json:"total_present"`
 	TotalLate         int `json:"total_late"`
@@ -25,8 +34,9 @@ type PendingRequestDTO struct {
 	Status    string `json:"status"`
 }
 
+// EmployeeDashboardResponse — sesuai kontrak frontend EmployeeDashboardData (§13.1)
 type EmployeeDashboardResponse struct {
-	Today           interface{}              `json:"today"`
+	Today           TodayAttendanceStatus    `json:"today"`
 	MutabaahToday   interface{}              `json:"mutabaah_today"`
 	MonthlySummary  AttendanceSummaryDTO     `json:"monthly_summary"`
 	LeaveBalances   []LeaveBalanceSummaryDTO `json:"leave_balances"`
@@ -81,6 +91,7 @@ type ExpiringContractDTO struct {
 	DaysRemaining  int    `json:"days_remaining"`
 }
 
+// HRDDashboardResponse — sesuai kontrak frontend HRDDashboardData (§13.2)
 type HRDDashboardResponse struct {
 	ApprovalQueue     []ApprovalQueueItemDTO   `json:"approval_queue"`
 	ApprovalCounts    ApprovalCountsDTO        `json:"approval_counts"`
