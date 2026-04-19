@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"hris-backend/internal/struct/dto"
 
@@ -57,13 +58,18 @@ func (r *dashboardRepository) GetMonthlyAttendanceSummary(ctx context.Context, e
 
 func (r *dashboardRepository) GetLeaveBalanceSummary(ctx context.Context, employeeID uint, year int) ([]dto.LeaveBalanceSummaryDTO, error) {
 	var summary []dto.LeaveBalanceSummaryDTO
+
 	query := `
 		SELECT
 			lt.id AS leave_type_id,
 			lt.name AS leave_type_name,
-			lb.total_quota,
-			lb.used,
-			lb.remaining
+			lt.max_occurrences_per_year AS total_quota,
+			lb.used_duration AS used,
+			CASE
+				WHEN lt.max_total_duration_per_year IS NOT NULL
+				THEN lt.max_total_duration_per_year - lb.used_duration
+				ELSE NULL
+			END AS remaining
 		FROM leave_balances lb
 		JOIN leave_types lt ON lt.id = lb.leave_type_id
 		WHERE lb.employee_id = ? AND lb.year = ? AND lb.deleted_at IS NULL
@@ -74,26 +80,27 @@ func (r *dashboardRepository) GetLeaveBalanceSummary(ctx context.Context, employ
 
 func (r *dashboardRepository) GetPendingRequests(ctx context.Context, employeeID uint) ([]dto.PendingRequestDTO, error) {
 	var requests []dto.PendingRequestDTO
+
 	query := `
-		SELECT id, 'leave' AS type, 'Cuti' AS label, created_at::TEXT, status
+		SELECT id, 'leave' AS type, 'Cuti' AS label, created_at::TEXT, status::TEXT AS status
 		FROM leave_requests 
 		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
 		UNION ALL
-		SELECT id, 'permission' AS type, 'Izin' AS label, created_at::TEXT, status
+		SELECT id, 'permission' AS type, 'Izin' AS label, created_at::TEXT, status::TEXT AS status
 		FROM permission_requests 
 		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
 		UNION ALL
-		SELECT id, 'overtime' AS type, 'Lembur' AS label, created_at::TEXT, status
+		SELECT id, 'overtime' AS type, 'Lembur' AS label, created_at::TEXT, status::TEXT AS status
 		FROM overtime_requests 
 		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
 		UNION ALL
-		SELECT id, 'business_trip' AS type, 'Dinas Luar' AS label, created_at::TEXT, status
+		SELECT id, 'business_trip' AS type, 'Dinas Luar' AS label, created_at::TEXT, status::TEXT AS status
 		FROM business_trip_requests 
 		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
 		UNION ALL
-		SELECT id, 'attendance_override' AS type, 'Koreksi Absen' AS label, created_at::TEXT, status
+		SELECT id, 'attendance_override' AS type, 'Koreksi Absen' AS label, created_at::TEXT, status::TEXT AS status
 		FROM attendance_overrides 
-		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
+		WHERE requested_by = ? AND status = 'pending' AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT 10
 	`
@@ -103,10 +110,7 @@ func (r *dashboardRepository) GetPendingRequests(ctx context.Context, employeeID
 
 func (r *dashboardRepository) GetApprovalQueue(ctx context.Context, approverID uint) ([]dto.ApprovalQueueItemDTO, error) {
 	var items []dto.ApprovalQueueItemDTO
-	
-	// Example query for queue. HRD handles everything or department manager handles their own. 
-	// For simplicity in this endpoint: we pull all pending ones. If HRD, we might not use approverID.
-	// But let's build a unified pending queue query for HR.
+
 	query := `
 		SELECT l.id, 'leave' AS type, e.full_name AS employee_name, 'Cuti' AS label, l.created_at::TEXT
 		FROM leave_requests l JOIN employees e ON e.id = l.employee_id WHERE l.status = 'pending' AND l.deleted_at IS NULL
@@ -121,7 +125,7 @@ func (r *dashboardRepository) GetApprovalQueue(ctx context.Context, approverID u
 		FROM business_trip_requests b JOIN employees e ON e.id = b.employee_id WHERE b.status = 'pending' AND b.deleted_at IS NULL
 		UNION ALL
 		SELECT a.id, 'override' AS type, e.full_name AS employee_name, 'Koreksi Absen' AS label, a.created_at::TEXT
-		FROM attendance_overrides a JOIN employees e ON e.id = a.employee_id WHERE a.status = 'pending' AND a.deleted_at IS NULL
+		FROM attendance_overrides a JOIN employees e ON e.id = a.requested_by WHERE a.status = 'pending' AND a.deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT 20
 	`
@@ -139,7 +143,6 @@ func (r *dashboardRepository) GetApprovalCounts(ctx context.Context, approverID 
 			(SELECT count(*) FROM business_trip_requests WHERE status='pending' AND deleted_at IS NULL) AS business_trip,
 			(SELECT count(*) FROM attendance_overrides WHERE status='pending' AND deleted_at IS NULL) AS override
 	`
-	// Menjumlahkan total
 	err := r.getDB(ctx).Raw(query).Scan(&counts).Error
 	if err == nil {
 		counts.Total = counts.Leave + counts.Permission + counts.Overtime + counts.BusinessTrip + counts.Override
@@ -149,7 +152,6 @@ func (r *dashboardRepository) GetApprovalCounts(ctx context.Context, approverID 
 
 func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date string) (dto.TeamAttendanceSummaryDTO, error) {
 	var summary dto.TeamAttendanceSummaryDTO
-	// Simplified logic for dashboard
 	query := `
 		SELECT
 			(SELECT count(*) FROM employees WHERE deleted_at IS NULL) AS total_employees,
@@ -158,9 +160,6 @@ func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date
 			(SELECT count(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'leave' AND deleted_at IS NULL) AS on_leave
 	`
 	err := r.getDB(ctx).Raw(query, date, date, date).Scan(&summary).Error
-	
-	// NotClockedIn: total - present - late - on_leave - others
-	// but simpler: total - (attendance_logs mapped today)
 	if err == nil {
 		var mapped int
 		r.getDB(ctx).Raw("SELECT count(DISTINCT employee_id) FROM attendance_logs WHERE attendance_date = ?::DATE AND deleted_at IS NULL", date).Scan(&mapped)
@@ -174,7 +173,6 @@ func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date
 
 func (r *dashboardRepository) GetTeamMutabaahSummary(ctx context.Context, date string) (dto.TeamMutabaahSummaryDTO, error) {
 	var summary dto.TeamMutabaahSummaryDTO
-	// How many employess should submit vs submitted
 	query := `
 		SELECT
 			(SELECT count(DISTINCT employee_id) FROM attendance_logs WHERE attendance_date = ?::DATE AND status IN ('present', 'late') AND deleted_at IS NULL) AS total_employees,
@@ -192,21 +190,29 @@ func (r *dashboardRepository) GetTeamMutabaahSummary(ctx context.Context, date s
 
 func (r *dashboardRepository) GetNotClockedIn(ctx context.Context, date string) ([]dto.NotClockedInDTO, error) {
 	var list []dto.NotClockedInDTO
+
 	query := `
-		SELECT e.id AS employee_id, e.full_name AS employee_name, e.employee_number, d.name AS department_name, std.start_time AS shift_start
+		SELECT
+			e.id AS employee_id,
+			e.full_name AS employee_name,
+			e.employee_number,
+			d.name AS department_name,
+			std.clock_in_start AS shift_start
 		FROM employees e
 		LEFT JOIN departments d ON d.id = e.department_id
 		LEFT JOIN employee_schedules es ON es.employee_id = e.id AND es.is_active = true AND es.deleted_at IS NULL
-		LEFT JOIN shift_templates st ON st.id = es.shift_template_id
-		LEFT JOIN shift_template_details std ON std.shift_template_id = st.id AND std.day_of_week = EXTRACT(ISODOW FROM ?::DATE)
-		WHERE e.deleted_at IS NULL 
-		AND e.id NOT IN (
+		LEFT JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		LEFT JOIN shift_template_details std
+			ON std.shift_template_id = st.id
+			AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+			AND std.deleted_at IS NULL
+		WHERE e.deleted_at IS NULL
+		  AND e.id NOT IN (
 			SELECT employee_id FROM attendance_logs WHERE attendance_date = ?::DATE AND deleted_at IS NULL
-		)
-		-- hanya tampilkan yang punya shift hari ini
-		AND std.start_time IS NOT NULL
-		AND std.is_off_day = false
-		ORDER BY std.start_time ASC
+		  )
+		  AND std.clock_in_start IS NOT NULL
+		  AND std.is_working_day = true
+		ORDER BY std.clock_in_start ASC
 		LIMIT 10
 	`
 	err := r.getDB(ctx).Raw(query, date, date).Scan(&list).Error
@@ -219,21 +225,20 @@ func (r *dashboardRepository) GetExpiringContracts(ctx context.Context, days int
 		return nil, errors.New("days must be positive")
 	}
 
-	query := `
+	query := fmt.Sprintf(`
 		SELECT 
 			e.id AS employee_id, 
 			e.full_name AS employee_name, 
 			e.employee_number, 
-			ec.contract_type, 
+			ec.contract_type::TEXT AS contract_type, 
 			ec.end_date::TEXT AS end_date,
 			(ec.end_date - CURRENT_DATE) AS days_remaining
 		FROM employment_contracts ec
 		JOIN employees e ON e.id = ec.employee_id
-		WHERE ec.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + (? || ' days')::INTERVAL)
-		  AND ec.status = 'active'
+		WHERE ec.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '%d days')
 		  AND ec.deleted_at IS NULL
 		ORDER BY ec.end_date ASC
-	`
-	err := r.getDB(ctx).Raw(query, days).Scan(&list).Error
+	`, days)
+	err := r.getDB(ctx).Raw(query).Scan(&list).Error
 	return list, err
 }

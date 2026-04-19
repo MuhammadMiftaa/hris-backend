@@ -227,7 +227,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 			dist := utils.HaversineDistance(req.Latitude, req.Longitude, *branch.Latitude, *branch.Longitude)
 			if dist > float64(branch.RadiusMeters) {
 				return dto.AttendanceLogResponse{}, fmt.Errorf(
-					"lokasi anda (%.0f meter) di luar radius presensi yang diizinkan (%d meter)",
+					"bad request: lokasi anda (%.0f meter) di luar radius presensi yang diizinkan (%d meter)",
 					dist, branch.RadiusMeters,
 				)
 			}

@@ -24,14 +24,14 @@ func AttendanceRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 		attendance.Get("/today", middleware.RBACMiddleware(data.PERM_AttendanceRead), h.GetTodayStatus)
 
 		// Pegawai: presign upload foto
-		attendance.Post("/presign", middleware.RBACMiddleware(data.PERM_AttendanceCreate), h.PresignClockPhoto)
+		attendance.Post("/presign", middleware.RBACMiddleware(data.PERM_HomeClockIn, data.PERM_HomeClockOut), h.PresignClockPhoto)
 
 		// Pegawai: signed download URL untuk foto
 		attendance.Get("/photo", middleware.RBACMiddleware(data.PERM_AttendanceRead), h.GetPhotoURL)
 
 		// Pegawai: clock in / clock out
-		attendance.Post("/clock-in", middleware.RBACMiddleware(data.PERM_AttendanceCreate), h.ClockIn)
-		attendance.Post("/clock-out", middleware.RBACMiddleware(data.PERM_AttendanceCreate), h.ClockOut)
+		attendance.Post("/clock-in", middleware.RBACMiddleware(data.PERM_HomeClockIn), h.ClockIn)
+		attendance.Post("/clock-out", middleware.RBACMiddleware(data.PERM_HomeClockOut), h.ClockOut)
 
 		// Admin: daftar semua presensi
 		attendance.Get("/", middleware.RBACMiddleware(data.PERM_AttendanceRead), h.List)
