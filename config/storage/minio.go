@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"hris-backend/config/env"
 
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/cors"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
@@ -34,9 +32,7 @@ type MinioClient interface {
 }
 
 type minioClient struct {
-	client         *minio.Client
-	internalOrigin string
-	publicOrigin   string
+	client *minio.Client
 }
 
 // NewMinioClient membuat koneksi ke MinIO server menggunakan config env
@@ -48,23 +44,13 @@ func NewMinioClient(cfg env.Minio) (MinioClient, error) {
 
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure: cfg.Secure,
+		Secure: false, // set true jika MinIO di-proxy dengan HTTPS/TLS
 	})
 	if err != nil {
 		return nil, fmt.Errorf("minio: failed to create client: %w", err)
 	}
 
-	scheme := "http"
-	if cfg.Secure {
-		scheme = "https"
-	}
-	internalOrigin := fmt.Sprintf("%s://%s", scheme, endpoint)
-
-	return &minioClient{
-		client:         client,
-		internalOrigin: internalOrigin,
-		publicOrigin:   cfg.PublicURL,
-	}, nil
+	return &minioClient{client: client}, nil
 }
 
 // EnsureBuckets buat bucket saat startup jika belum ada, dan set policy private
@@ -79,33 +65,23 @@ func (m *minioClient) EnsureBuckets(ctx context.Context) error {
 			if err := m.client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 				return fmt.Errorf("minio: create bucket %s: %w", bucket, err)
 			}
-			policy := fmt.Sprintf(`{...}`, bucket)
+			// Deny public GetObject — akses hanya via presigned URL
+			policy := fmt.Sprintf(`{
+				"Version":"2012-10-17",
+				"Statement":[{
+					"Effect":"Deny",
+					"Principal":"*",
+					"Action":["s3:GetObject"],
+					"Resource":["arn:aws:s3:::%s/*"]
+				}]
+			}`, bucket)
 			if err := m.client.SetBucketPolicy(ctx, bucket, policy); err != nil {
+				// Non-fatal — default MinIO sudah private, log saja
 				fmt.Printf("minio: warn: set policy %s: %v\n", bucket, err)
 			}
 		}
-
-		corsConfig := cors.NewConfig([]cors.Rule{
-			{
-				AllowedOrigin: []string{"https://hris.miv.best"},
-				AllowedMethod: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-				AllowedHeader: []string{"*"},
-				ExposeHeader:  []string{"ETag"},
-				MaxAgeSeconds: 3600,
-			},
-		})
-		if err := m.client.SetBucketCors(ctx, bucket, corsConfig); err != nil {
-			fmt.Printf("minio: warn: set cors %s: %v\n", bucket, err)
-		}
 	}
 	return nil
-}
-
-func (m *minioClient) toPublicURL(u *url.URL) string {
-	if m.publicOrigin == "" {
-		return u.String()
-	}
-	return strings.Replace(u.String(), m.internalOrigin, m.publicOrigin, 1)
 }
 
 func (m *minioClient) PresignedPutObject(ctx context.Context, bucket, object string, expiry time.Duration) (string, error) {
@@ -113,7 +89,7 @@ func (m *minioClient) PresignedPutObject(ctx context.Context, bucket, object str
 	if err != nil {
 		return "", fmt.Errorf("minio: presigned put %s/%s: %w", bucket, object, err)
 	}
-	return m.toPublicURL(u), nil
+	return u.String(), nil
 }
 
 func (m *minioClient) PresignedGetObject(ctx context.Context, bucket, object string, expiry time.Duration) (string, error) {
@@ -121,5 +97,5 @@ func (m *minioClient) PresignedGetObject(ctx context.Context, bucket, object str
 	if err != nil {
 		return "", fmt.Errorf("minio: presigned get %s/%s: %w", bucket, object, err)
 	}
-	return m.toPublicURL(u), nil
+	return u.String(), nil
 }
