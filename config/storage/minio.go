@@ -10,6 +10,7 @@ import (
 	"hris-backend/config/env"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/cors"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
@@ -78,20 +79,23 @@ func (m *minioClient) EnsureBuckets(ctx context.Context) error {
 			if err := m.client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 				return fmt.Errorf("minio: create bucket %s: %w", bucket, err)
 			}
-			// Deny public GetObject — akses hanya via presigned URL
-			policy := fmt.Sprintf(`{
-				"Version":"2012-10-17",
-				"Statement":[{
-					"Effect":"Deny",
-					"Principal":"*",
-					"Action":["s3:GetObject"],
-					"Resource":["arn:aws:s3:::%s/*"]
-				}]
-			}`, bucket)
+			policy := fmt.Sprintf(`{...}`, bucket)
 			if err := m.client.SetBucketPolicy(ctx, bucket, policy); err != nil {
-				// Non-fatal — default MinIO sudah private, log saja
 				fmt.Printf("minio: warn: set policy %s: %v\n", bucket, err)
 			}
+		}
+
+		corsConfig := cors.NewConfig([]cors.Rule{
+			{
+				AllowedOrigin: []string{"https://hris.miv.best"},
+				AllowedMethod: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+				AllowedHeader: []string{"*"},
+				ExposeHeader:  []string{"ETag"},
+				MaxAgeSeconds: 3600,
+			},
+		})
+		if err := m.client.SetBucketCors(ctx, bucket, corsConfig); err != nil {
+			fmt.Printf("minio: warn: set cors %s: %v\n", bucket, err)
 		}
 	}
 	return nil
