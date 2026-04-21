@@ -46,8 +46,8 @@ func (r *dashboardRepository) GetTodayAttendanceStatus(ctx context.Context, empl
 
 	err := r.getDB(ctx).Raw(`
 		SELECT
-			TO_CHAR(clock_in_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS clock_in_at,
-			TO_CHAR(clock_out_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS clock_out_at,
+			TO_CHAR(clock_in_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS clock_in_at,
+			TO_CHAR(clock_out_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS clock_out_at,
 			status::TEXT AS status,
 			late_minutes
 		FROM attendance_logs
