@@ -647,6 +647,15 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 		if effectiveClockOut == nil {
 			effectiveClockOut = ov.OriginalClockOut
 		}
+		// Force fix timezone from UTC to WIB
+		if effectiveClockIn != nil {
+			fixTZ := effectiveClockIn.Add(-7*time.Hour)
+			effectiveClockIn = &fixTZ
+		}
+		if effectiveClockOut != nil {
+			fixTZ := effectiveClockOut.Add(-7*time.Hour)
+			effectiveClockOut = &fixTZ
+		}
 		log.Debug("Clock in & Clock out", map[string]any{
 			"effective_clock_in":  effectiveClockIn,
 			"effective_clock_out": effectiveClockOut,

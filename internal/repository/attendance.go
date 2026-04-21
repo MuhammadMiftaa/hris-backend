@@ -558,7 +558,7 @@ func (r *attendanceRepository) GetAllOverrides(ctx context.Context, tx Transacti
 			ao.updated_at
 		FROM attendance_overrides ao
 		JOIN attendance_logs al ON al.id = ao.attendance_log_id
-		JOIN employees e1 ON e1.id = ao.requested_by
+		JOIN employees e1 ON e1.id = al.employee_id
 		LEFT JOIN employees e2 ON e2.id = ao.approved_by
 		WHERE ao.deleted_at IS NULL
 	`
@@ -608,7 +608,7 @@ func (r *attendanceRepository) GetOverrideByID(ctx context.Context, tx Transacti
 			ao.updated_at
 		FROM attendance_overrides ao
 		JOIN attendance_logs al ON al.id = ao.attendance_log_id
-		JOIN employees e1 ON e1.id = ao.requested_by
+		JOIN employees e1 ON e1.id = al.employee_id
 		LEFT JOIN employees e2 ON e2.id = ao.approved_by
 		WHERE ao.id = ? AND ao.deleted_at IS NULL
 	`, id).Scan(&resp).Error
