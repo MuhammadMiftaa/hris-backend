@@ -87,8 +87,14 @@ func GenerateEmail(name string) string {
 	return fmt.Sprintf("%s@wafa.id", name)
 }
 
+var wib = time.FixedZone("WIB", 7*60*60)
+
+func NowWIB() time.Time {
+	return time.Now().In(wib)
+}
+
 func TodayDate() string {
-	return time.Now().Format("2006-01-02")
+	return NowWIB().Format("2006-01-02")
 }
 
 // haversineDistance menghitung jarak dua koordinat dalam meter

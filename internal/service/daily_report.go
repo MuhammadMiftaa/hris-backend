@@ -8,6 +8,7 @@ import (
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 )
 
 type DailyReportService interface {
@@ -49,7 +50,7 @@ func (s *dailyReportService) Create(ctx context.Context, employeeID uint, req dt
 		attendanceLogID = *req.AttendanceLogID
 	}
 
-	now := time.Now()
+	now := utils.NowWIB()
 	m := model.DailyReport{
 		EmployeeID:      employeeID,
 		ReportDate:      d,
@@ -75,13 +76,13 @@ func (s *dailyReportService) Update(ctx context.Context, id uint, employeeID uin
 	}
 
 	updates := map[string]interface{}{
-		"updated_at": time.Now(),
+		"updated_at": utils.NowWIB(),
 	}
 
 	if req.Activities != nil {
 		updates["activities"] = req.Activities
 		// If updating activities, mark as submitted
-		now := time.Now()
+		now := utils.NowWIB()
 		updates["is_submitted"] = true
 		updates["submitted_at"] = now
 	}

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
@@ -73,7 +72,7 @@ func (s *mutabaahService) GetTodayStatus(ctx context.Context, employeeID uint) (
 
 func (s *mutabaahService) Submit(ctx context.Context, employeeID uint, isTrainer bool, req dto.MutabaahSubmitRequest) (dto.MutabaahLogResponse, error) {
 	today := utils.TodayDate()
-	now := time.Now()
+	now := utils.NowWIB()
 
 	if req.AttendanceLogID == 0 {
 		return dto.MutabaahLogResponse{}, fmt.Errorf("attendance_log_id is required")
@@ -142,7 +141,7 @@ func (s *mutabaahService) Submit(ctx context.Context, employeeID uint, isTrainer
 
 func (s *mutabaahService) Cancel(ctx context.Context, employeeID uint, req dto.MutabaahCancelRequest) (dto.MutabaahLogResponse, error) {
 	today := utils.TodayDate()
-	now := time.Now()
+	now := utils.NowWIB()
 
 	existing, err := s.repo.GetTodayLog(ctx, nil, employeeID, today)
 	if err != nil {
@@ -190,7 +189,7 @@ func (s *mutabaahService) GetAllLogs(ctx context.Context, params dto.MutabaahLis
 }
 
 func (s *mutabaahService) HRDCancel(ctx context.Context, id uint) (dto.MutabaahLogResponse, error) {
-	now := time.Now()
+	now := utils.NowWIB()
 
 	err := s.repo.UpdateLog(ctx, nil, id, map[string]interface{}{
 		"is_submitted": false,

@@ -140,7 +140,7 @@ func (s *attendanceService) GetTodayStatus(ctx context.Context, employeeID uint)
 
 func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dto.ClockInRequest) (dto.AttendanceLogResponse, error) {
 	today := utils.TodayDate()
-	now := time.Now()
+	now := utils.NowWIB()
 
 	// 1. Cek sudah presensi hari ini
 	existing, err := s.repo.GetTodayLog(ctx, nil, employeeID, today)
@@ -296,7 +296,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 
 func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req dto.ClockOutRequest) (dto.AttendanceLogResponse, error) {
 	today := utils.TodayDate()
-	now := time.Now()
+	now := utils.NowWIB()
 
 	// 1. Harus sudah clock in dulu
 	existing, err := s.repo.GetTodayLog(ctx, nil, employeeID, today)
