@@ -614,9 +614,9 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 	defer tx.Rollback()
 
 	updates := map[string]interface{}{
-		"status":         req.Status,
-		"approved_by":    employeeID,
-		"approver_notes": req.ApproverNotes,
+		"status":      req.Status,
+		"approved_by": employeeID,
+		"reason":      req.ApproverNotes,
 	}
 
 	if err := s.repo.UpdateOverrideStatus(ctx, tx, id, updates); err != nil {
