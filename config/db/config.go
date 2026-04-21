@@ -45,7 +45,7 @@ func DefaultPoolConfig() ConnectionPoolConfig {
 
 func NewDatabaseClient(cfg env.Database, poolCfg ConnectionPoolConfig) (DatabaseClient, error) {
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC-7",
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Jakarta",
 		cfg.DBHost,
 		cfg.DBUser,
 		cfg.DBPassword,

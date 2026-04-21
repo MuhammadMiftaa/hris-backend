@@ -5,6 +5,8 @@ VALUES (1, 'Superadmin', 'Memiliki akses penuh ke seluruh fitur dan fungsi siste
 
 INSERT INTO role_permissions (role_id, permission_code)
 SELECT 1, code FROM permissions;
+
+SELECT nextval('roles_id_seq');
 -- +goose StatementEnd
 
 -- +goose Down

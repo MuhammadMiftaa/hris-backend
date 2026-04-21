@@ -11,6 +11,8 @@ VALUES (
   100, 
   false
 );
+
+SELECT nextval('branches_id_seq');
 -- +goose StatementEnd
 
 -- +goose Down
