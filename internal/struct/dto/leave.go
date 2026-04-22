@@ -33,7 +33,7 @@ type LeaveRequestResponse struct {
 	Reason        *string                 `json:"reason"`
 	DocumentURL   *string                 `json:"document_url"`
 	Status        string                  `json:"status"`
-	Approvals     []LeaveApprovalResponse `json:"approvals,omitempty"`
+	Approvals     []LeaveApprovalResponse `json:"approvals,omitempty" gorm:"-"`
 	CreatedAt     time.Time               `json:"created_at"`
 	UpdatedAt     *time.Time              `json:"updated_at"`
 	DeletedAt     *time.Time              `json:"deleted_at"`
@@ -42,7 +42,7 @@ type LeaveRequestResponse struct {
 type LeaveApprovalResponse struct {
 	ID             uint       `json:"id"`
 	LeaveRequestID uint       `json:"leave_request_id"`
-	ApproverID     uint       `json:"approver_id"`
+	ApproverID     *uint      `json:"approver_id"`
 	ApproverName   *string    `json:"approver_name"`
 	Level          int        `json:"level"`
 	Status         string     `json:"status"`

@@ -36,7 +36,7 @@ func (s *Scheduler) Stop() {
 
 func (s *Scheduler) run() {
 	// Pertama kali: hitung waktu ke pukul 23:50 berikutnya
-	now := time.Now()
+	now := utils.NowWIB()
 	next := nextRunTime(now, 23, 50)
 
 	timer := time.NewTimer(next.Sub(now))
@@ -47,7 +47,7 @@ func (s *Scheduler) run() {
 		case <-timer.C:
 			s.runJobs()
 			// Reset timer ke 23:50 besok
-			now = time.Now()
+			now = utils.NowWIB()
 			next = nextRunTime(now, 23, 50)
 			timer.Reset(next.Sub(now))
 

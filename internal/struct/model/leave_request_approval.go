@@ -13,7 +13,7 @@ const (
 type LeaveRequestApproval struct {
 	ID             uint               `gorm:"primaryKey;autoIncrement"             json:"id"`
 	LeaveRequestID uint               `gorm:"not null;index"                       json:"leave_request_id"`
-	ApproverID     uint               `gorm:"not null;index"                       json:"approver_id"`
+	ApproverID     *uint              `gorm:"index"                                json:"approver_id"`
 	Level          int                `gorm:"not null"                             json:"level"`
 	Status         ApprovalStatusEnum `gorm:"type:approval_status_enum;not null;default:pending" json:"status"`
 	Notes          *string            `gorm:"type:text"                            json:"notes"`

@@ -139,16 +139,22 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req d
 	}
 
 	// create approvals
-	_, _ = s.repo.CreateApproval(ctx, tx, model.LeaveRequestApproval{
+	_, err = s.repo.CreateApproval(ctx, tx, model.LeaveRequestApproval{
 		LeaveRequestID: created.ID,
 		Level:          1,
 		Status:         "pending",
 	})
-	_, _ = s.repo.CreateApproval(ctx, tx, model.LeaveRequestApproval{
+	if err != nil {
+		return dto.LeaveRequestResponse{}, fmt.Errorf("create approval: %w", err)
+	}
+	_, err = s.repo.CreateApproval(ctx, tx, model.LeaveRequestApproval{
 		LeaveRequestID: created.ID,
 		Level:          2,
 		Status:         "pending",
 	})
+	if err != nil {
+		return dto.LeaveRequestResponse{}, fmt.Errorf("create approval: %w", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return dto.LeaveRequestResponse{}, fmt.Errorf("commit tx: %w", err)
