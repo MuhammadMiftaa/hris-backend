@@ -39,7 +39,7 @@ func isAllowedOrigin(origin string) bool {
 		}
 	}
 
-	allowedSuffixes := []string{".miftech.web.id", ".miv.best"}
+	allowedSuffixes := []string{".miftech.web.id", ".miv.best", ".wafaindonesia.or.id"}
 	for _, suffix := range allowedSuffixes {
 		if strings.HasSuffix(origin, suffix) {
 			return true
