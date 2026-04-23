@@ -50,3 +50,31 @@ type HolidayListParams struct {
 	Type     *string
 	BranchID *uint
 }
+
+// ── External API ───────────────────────────────────────
+
+type ExternalHolidayItem struct {
+	Date         string   `json:"date"`
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	IsHoliday    bool     `json:"is_holiday"`
+	IsObservance bool     `json:"is_observance"`
+	Holidays     []string `json:"holidays"`
+}
+
+type ExternalHolidayAPIResponse struct {
+	IsSuccess bool                  `json:"is_success"`
+	Data      []ExternalHolidayItem `json:"data"`
+}
+
+type SyncHolidayRequest struct {
+	Year     int   `json:"year"`
+	BranchID *uint `json:"branch_id"`
+}
+
+type SyncHolidayResponse struct {
+	Synced  int      `json:"synced"`
+	Skipped int      `json:"skipped"`
+	Year    int      `json:"year"`
+	Errors  []string `json:"errors,omitempty"`
+}

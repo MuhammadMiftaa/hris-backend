@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
+	"hris-backend/config/env"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -18,6 +22,7 @@ type HolidayService interface {
 	CreateHoliday(ctx context.Context, req dto.CreateHolidayRequest) (dto.HolidayResponse, error)
 	UpdateHoliday(ctx context.Context, id uint, req dto.UpdateHolidayRequest) (dto.HolidayResponse, error)
 	DeleteHoliday(ctx context.Context, id uint) error
+	SyncFromExternalAPI(ctx context.Context, req dto.SyncHolidayRequest) (dto.SyncHolidayResponse, error)
 }
 
 type holidayService struct {
@@ -29,10 +34,10 @@ func NewHolidayService(repo repository.HolidayRepository) HolidayService {
 }
 
 var validHolidayTypes = map[string]bool{
-	"national":    true,
-	"joint":       true,
-	"observance":  true,
-	"company":     true,
+	"national":   true,
+	"joint":      true,
+	"observance": true,
+	"company":    true,
 }
 
 func (s *holidayService) GetMetadata(ctx context.Context) (dto.HolidayMetadata, error) {
@@ -152,4 +157,88 @@ func (s *holidayService) DeleteHoliday(ctx context.Context, id uint) error {
 		return fmt.Errorf("delete holiday: %w", err)
 	}
 	return nil
+}
+
+func (s *holidayService) SyncFromExternalAPI(ctx context.Context, req dto.SyncHolidayRequest) (dto.SyncHolidayResponse, error) {
+    if req.Year <= 0 {
+        req.Year = time.Now().Year()
+    }
+
+    apiURL := fmt.Sprintf("%s/%d", env.Cfg.ExternalAPI.IndonesiaHolidayAPIURL, req.Year)
+
+    httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+    if err != nil {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("build request: %w", err)
+    }
+    httpReq.Header.Set("X-Api-Key", env.Cfg.ExternalAPI.IndonesiaHolidayAPIKey)
+    httpReq.Header.Set("Accept", "application/json")
+
+    client := &http.Client{Timeout: 15 * time.Second}
+    resp, err := client.Do(httpReq)
+    if err != nil {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("call external API: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("external API returned status %d", resp.StatusCode)
+    }
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("read response: %w", err)
+    }
+
+    var apiResp dto.ExternalHolidayAPIResponse
+    if err := json.Unmarshal(body, &apiResp); err != nil {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("parse response: %w", err)
+    }
+    if !apiResp.IsSuccess {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("external API returned unsuccessful response")
+    }
+
+    // Map ke model Holiday
+    var holidays []model.Holiday
+    var errs []string
+    for _, item := range apiResp.Data {
+        if !item.IsHoliday && !item.IsObservance {
+            continue
+        }
+
+        parsedDate, err := time.Parse("2006-01-02", item.Date)
+        if err != nil {
+            errs = append(errs, fmt.Sprintf("skip %s: invalid date", item.Date))
+            continue
+        }
+
+        holidayType := model.HolidayNational
+        if item.IsObservance && !item.IsHoliday {
+            holidayType = model.HolidayObservance
+        }
+
+        name := item.Name
+        if name == "" && len(item.Holidays) > 0 {
+            name = item.Holidays[0]
+        }
+
+        holidays = append(holidays, model.Holiday{
+            Name:     name,
+            Year:     req.Year,
+            Date:     parsedDate,
+            Type:     holidayType,
+            BranchID: req.BranchID,
+        })
+    }
+
+    synced, skipped, err := s.repo.UpsertHolidays(ctx, nil, holidays)
+    if err != nil {
+        return dto.SyncHolidayResponse{}, fmt.Errorf("upsert holidays: %w", err)
+    }
+
+    return dto.SyncHolidayResponse{
+        Synced:  synced,
+        Skipped: skipped,
+        Year:    req.Year,
+        Errors:  errs,
+    }, nil
 }

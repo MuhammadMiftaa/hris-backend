@@ -98,3 +98,21 @@ func (h *HolidayHandler) Delete(c *fiber.Ctx) error {
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Holiday deleted"})
 }
+
+func (h *HolidayHandler) SyncFromExternalAPI(c *fiber.Ctx) error {
+	var req dto.SyncHolidayRequest
+	if err := c.BodyParser(&req); err != nil {
+		return respondBadRequest(c, "invalid request body")
+	}
+
+	res, err := h.service.SyncFromExternalAPI(c.Context(), req)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "holiday sync completed",
+		Data:       res,
+	})
+}

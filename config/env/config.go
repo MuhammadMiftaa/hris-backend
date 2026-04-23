@@ -37,11 +37,17 @@ type (
 		PublicURL string `env:"MINIO_PUBLIC_URL"`
 	}
 
+	ExternalAPI struct {
+		IndonesiaHolidayAPIKey string `env:"INDONESIA_HOLIDAY_API_KEY"`
+		IndonesiaHolidayAPIURL string `env:"INDONESIA_HOLIDAY_API_URL"`
+	}
+
 	Config struct {
-		Server   Server
-		Database Database
-		Redis    Redis
-		Minio    Minio
+		Server      Server
+		Database    Database
+		Redis       Redis
+		Minio       Minio
+		ExternalAPI ExternalAPI
 	}
 )
 
@@ -91,6 +97,9 @@ func LoadNative() ([]string, error) {
 	lookupEnv("MINIO_ROOT_USER", &Cfg.Minio.AccessKey, &missing)
 	lookupEnv("MINIO_ROOT_PASSWORD", &Cfg.Minio.SecretKey, &missing)
 	lookupEnv("MINIO_PUBLIC_URL", &Cfg.Minio.PublicURL, &missing)
+
+	lookupEnv("INDONESIA_HOLIDAY_API_KEY", &Cfg.ExternalAPI.IndonesiaHolidayAPIKey, &missing)
+	lookupEnv("INDONESIA_HOLIDAY_API_URL", &Cfg.ExternalAPI.IndonesiaHolidayAPIURL, &missing)
 
 	return missing, nil
 }

@@ -23,5 +23,6 @@ func HolidayRoutes(app *fiber.App, db *gorm.DB) {
 		holidays.Post("/", middleware.RBACMiddleware(data.PERM_HolidayCreate), h.Create)
 		holidays.Put("/:id", middleware.RBACMiddleware(data.PERM_HolidayUpdate), h.Update)
 		holidays.Delete("/:id", middleware.RBACMiddleware(data.PERM_HolidayDelete), h.Delete)
+		holidays.Post("/sync", middleware.RBACMiddleware(data.PERM_HolidayCreate), h.SyncFromExternalAPI)
 	}
 }
