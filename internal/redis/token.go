@@ -15,7 +15,7 @@ import (
 
 const (
 	TokenLen            = 12
-	TokenAuthSessionExp = time.Second * 30     // 1 jam
+	TokenAuthSessionExp = time.Hour * 1     // 1 jam
 	TokenAuthRefreshExp = time.Hour * 24 * 30 // 30 hari
 
 	ServerAuthMsgInvalidToken = "invalid verification token"
