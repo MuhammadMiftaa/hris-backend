@@ -55,7 +55,7 @@ func (r *mutabaahRepository) GetTodayLog(ctx context.Context, tx Transaction, em
 	err = db.Raw(`
 		SELECT
 			ml.id,
-			ml.id AS attendance_log_id,
+			ml.attendance_log_id,
 			ml.employee_id,
 			e.full_name    AS employee_name,
 			ml.log_date::TEXT AS log_date,

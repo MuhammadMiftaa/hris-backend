@@ -84,7 +84,10 @@ func (s *dashboardService) buildMutabaahTodayStatus(ctx context.Context, employe
 		} else {
 			targetPages = 5
 		}
-		attendLog, _ := s.attendRepo.GetTodayLog(ctx, nil, employeeID, today)
+		attendLog, err := s.attendRepo.GetTodayLog(ctx, nil, employeeID, today)
+		if err != nil {
+			return nil
+		}
 		status := &dto.MutabaahTodayStatus{
 			HasRecord:   false,
 			IsSubmitted: false,

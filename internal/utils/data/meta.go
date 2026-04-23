@@ -78,7 +78,7 @@ var (
 			Name: "O",
 		},
 		{
-			ID:   "unknown",
+			ID:   "-",
 			Name: "Tidak Diketahui",
 		},
 	}
