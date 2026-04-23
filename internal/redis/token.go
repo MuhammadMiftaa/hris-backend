@@ -8,14 +8,15 @@ import (
 	"strconv"
 	"time"
 
+	"hris-backend/config/log"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/utils"
 )
 
 const (
-	TokenLen                = 12
-	TokenAuthSessionExp     = time.Hour * 1       // 1 jam
-	TokenAuthRefreshExp     = time.Hour * 24 * 30 // 30 hari
+	TokenLen            = 12
+	TokenAuthSessionExp = time.Second * 30     // 1 jam
+	TokenAuthRefreshExp = time.Hour * 24 * 30 // 30 hari
 
 	ServerAuthMsgInvalidToken = "invalid verification token"
 	ServerAuthMsgTokenExpired = "token expired, please refresh your token"
@@ -200,6 +201,9 @@ func SetRefreshToken(ctx context.Context, rdb Redis, refreshToken string, t *dto
 
 func GetRefreshToken(ctx context.Context, rdb Redis, refreshToken string) (*dto.Token, error) {
 	jt, err := rdb.Get(ctx, "refresh:"+refreshToken)
+	log.Debug("token", map[string]any{
+		"refresh token": "refresh:" + refreshToken,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("refresh token not found or expired")
 	}
@@ -207,7 +211,10 @@ func GetRefreshToken(ctx context.Context, rdb Redis, refreshToken string) (*dto.
 	if err := json.Unmarshal([]byte(jt), &token); err != nil {
 		return nil, err
 	}
-
+	log.Debug("token: %v", map[string]any{
+		"jt":    jt,
+		"token": token,
+	})
 	err = CheckToken(&token)
 	if err != nil {
 		return nil, fmt.Errorf("auth: error checking refresh token: %w", err)

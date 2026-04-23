@@ -54,17 +54,25 @@ type HolidayListParams struct {
 // ── External API ───────────────────────────────────────
 
 type ExternalHolidayItem struct {
-	Date         string   `json:"date"`
-	Name         string   `json:"name"`
-	Type         string   `json:"type"`
-	IsHoliday    bool     `json:"is_holiday"`
-	IsObservance bool     `json:"is_observance"`
-	Holidays     []string `json:"holidays"`
+	ID                int    `json:"id"`
+	Date              string `json:"date"`
+	Name              string `json:"name"`
+	Type              string `json:"type"`
+	IsNationalHoliday bool   `json:"is_national_holiday"`
+}
+
+type ExternalHolidayPaging struct {
+	Page      int `json:"page"`
+	Size      int `json:"size"`
+	TotalItem int `json:"total_item"`
+	TotalPage int `json:"total_page"`
 }
 
 type ExternalHolidayAPIResponse struct {
 	IsSuccess bool                  `json:"is_success"`
+	Message   string                `json:"message"`
 	Data      []ExternalHolidayItem `json:"data"`
+	Paging    ExternalHolidayPaging `json:"paging"`
 }
 
 type SyncHolidayRequest struct {

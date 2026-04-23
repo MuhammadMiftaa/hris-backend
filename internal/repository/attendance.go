@@ -63,6 +63,7 @@ type AttendanceRepository interface {
 
 	// Metadata
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetBranchMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 }
 
 type attendanceRepository struct {
@@ -655,6 +656,21 @@ func (r *attendanceRepository) GetEmployeeMetaList(ctx context.Context, tx Trans
 		FROM employees
 		WHERE deleted_at IS NULL
 		ORDER BY full_name ASC
+	`).Scan(&meta).Error
+	return meta, err
+}
+
+func (r *attendanceRepository) GetBranchMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var meta []dto.Meta
+	err = db.Raw(`
+		SELECT id::TEXT, name
+		FROM branches
+		WHERE deleted_at IS NULL
+		ORDER BY name ASC
 	`).Scan(&meta).Error
 	return meta, err
 }

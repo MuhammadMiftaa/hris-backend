@@ -160,85 +160,120 @@ func (s *holidayService) DeleteHoliday(ctx context.Context, id uint) error {
 }
 
 func (s *holidayService) SyncFromExternalAPI(ctx context.Context, req dto.SyncHolidayRequest) (dto.SyncHolidayResponse, error) {
-    if req.Year <= 0 {
-        req.Year = time.Now().Year()
-    }
+	if req.Year <= 0 {
+		req.Year = time.Now().Year()
+	}
 
-    apiURL := fmt.Sprintf("%s/%d", env.Cfg.ExternalAPI.IndonesiaHolidayAPIURL, req.Year)
+	// Fetch semua page (size fixed 100 per page per spec)
+	var allItems []dto.ExternalHolidayItem
+	page := 1
+	for {
+		items, totalPage, err := s.fetchExternalPage(ctx, req.Year, page)
+		if err != nil {
+			return dto.SyncHolidayResponse{}, err
+		}
+		allItems = append(allItems, items...)
+		if page >= totalPage {
+			break
+		}
+		page++
+	}
 
-    httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
-    if err != nil {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("build request: %w", err)
-    }
-    httpReq.Header.Set("X-Api-Key", env.Cfg.ExternalAPI.IndonesiaHolidayAPIKey)
-    httpReq.Header.Set("Accept", "application/json")
+	// Map ke model Holiday
+	var holidays []model.Holiday
+	var errs []string
+	for _, item := range allItems {
+		parsedDate, err := time.Parse("2006-01-02", item.Date)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("skip %s: invalid date format", item.Date))
+			continue
+		}
 
-    client := &http.Client{Timeout: 15 * time.Second}
-    resp, err := client.Do(httpReq)
-    if err != nil {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("call external API: %w", err)
-    }
-    defer resp.Body.Close()
+		holidayType := s.mapExternalType(item.Type)
 
-    if resp.StatusCode != http.StatusOK {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("external API returned status %d", resp.StatusCode)
-    }
+		holidays = append(holidays, model.Holiday{
+			Name:     item.Name,
+			Year:     req.Year,
+			Date:     parsedDate,
+			Type:     holidayType,
+			BranchID: req.BranchID,
+		})
+	}
 
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("read response: %w", err)
-    }
+	synced, skipped, err := s.repo.UpsertHolidays(ctx, nil, holidays)
+	if err != nil {
+		return dto.SyncHolidayResponse{}, fmt.Errorf("upsert holidays: %w", err)
+	}
 
-    var apiResp dto.ExternalHolidayAPIResponse
-    if err := json.Unmarshal(body, &apiResp); err != nil {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("parse response: %w", err)
-    }
-    if !apiResp.IsSuccess {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("external API returned unsuccessful response")
-    }
+	return dto.SyncHolidayResponse{
+		Synced:  synced,
+		Skipped: skipped,
+		Year:    req.Year,
+		Errors:  errs,
+	}, nil
+}
 
-    // Map ke model Holiday
-    var holidays []model.Holiday
-    var errs []string
-    for _, item := range apiResp.Data {
-        if !item.IsHoliday && !item.IsObservance {
-            continue
-        }
+func (s *holidayService) fetchExternalPage(ctx context.Context, year, page int) ([]dto.ExternalHolidayItem, int, error) {
+	apiURL := fmt.Sprintf("%s/holidays/indonesia/?year=%d&page=%d",
+		env.Cfg.ExternalAPI.IndonesiaHolidayAPIURL, year, page)
 
-        parsedDate, err := time.Parse("2006-01-02", item.Date)
-        if err != nil {
-            errs = append(errs, fmt.Sprintf("skip %s: invalid date", item.Date))
-            continue
-        }
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("build request: %w", err)
+	}
+	// Header auth sesuai spec: x-api-co-id
+	httpReq.Header.Set("x-api-co-id", env.Cfg.ExternalAPI.IndonesiaHolidayAPIKey)
+	httpReq.Header.Set("Accept", "application/json")
 
-        holidayType := model.HolidayNational
-        if item.IsObservance && !item.IsHoliday {
-            holidayType = model.HolidayObservance
-        }
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, 0, fmt.Errorf("call external API: %w", err)
+	}
+	defer resp.Body.Close()
 
-        name := item.Name
-        if name == "" && len(item.Holidays) > 0 {
-            name = item.Holidays[0]
-        }
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, 0, fmt.Errorf("invalid or missing API key (x-api-co-id)")
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, 0, fmt.Errorf("rate limit exceeded on external API")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, fmt.Errorf("external API returned status %d", resp.StatusCode)
+	}
 
-        holidays = append(holidays, model.Holiday{
-            Name:     name,
-            Year:     req.Year,
-            Date:     parsedDate,
-            Type:     holidayType,
-            BranchID: req.BranchID,
-        })
-    }
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("read response body: %w", err)
+	}
 
-    synced, skipped, err := s.repo.UpsertHolidays(ctx, nil, holidays)
-    if err != nil {
-        return dto.SyncHolidayResponse{}, fmt.Errorf("upsert holidays: %w", err)
-    }
+	var apiResp dto.ExternalHolidayAPIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, 0, fmt.Errorf("parse response JSON: %w", err)
+	}
+	if !apiResp.IsSuccess {
+		return nil, 0, fmt.Errorf("external API error: %s", apiResp.Message)
+	}
 
-    return dto.SyncHolidayResponse{
-        Synced:  synced,
-        Skipped: skipped,
-        Year:    req.Year,
-        Errors:  errs,
-    }, nil
+	totalPage := apiResp.Paging.TotalPage
+	if totalPage == 0 {
+		totalPage = 1
+	}
+
+	return apiResp.Data, totalPage, nil
+}
+
+func (s *holidayService) mapExternalType(externalType string) model.HolidayTypeEnum {
+	switch externalType {
+	case "Public Holiday":
+		return model.HolidayNational
+	case "National Holiday":
+		return model.HolidayNational
+	case "Joint Holiday":
+		return model.HolidayJoint
+	case "Observance":
+		return model.HolidayObservance
+	default:
+		return model.HolidayNational
+	}
 }

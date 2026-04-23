@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"hris-backend/config/env"
 	"hris-backend/config/log"
@@ -34,7 +33,7 @@ func NewAuthService(repo repository.AuthRepository, redis redis.Redis) AuthServi
 }
 
 func (s *authService) Login(ctx context.Context, req dto.LoginReq) (dto.LoginRes, error) {
-	timeNow := time.Now()
+	timeNow := utils.NowWIB()
 
 	account, err := s.repo.GetAccountByEmail(ctx, nil, req.Email)
 	if err != nil {
@@ -68,8 +67,8 @@ func (s *authService) Login(ctx context.Context, req dto.LoginReq) (dto.LoginRes
 		Account:     employee,
 		Permissions: result.Permissions,
 		Email:       account.Email,
-		IssuedAt:    fmt.Sprintf("%d", time.Now().Unix()),
-		Expires:     fmt.Sprintf("%d", time.Now().Add(redis.TokenAuthSessionExp).Unix()),
+		IssuedAt:    fmt.Sprintf("%d", timeNow.Unix()),
+		Expires:     fmt.Sprintf("%d", timeNow.Add(redis.TokenAuthRefreshExp).Unix()),
 		Issuer:      "hris-backend",
 		Subject:     fmt.Sprintf("%d", account.ID),
 		Nonce:       nonce,
@@ -95,13 +94,21 @@ func (s *authService) Login(ctx context.Context, req dto.LoginReq) (dto.LoginRes
 		result.Account.LastLoginAt = &timeNow
 	}
 
+	log.Debug("login", map[string]any{
+		"Exp": tokenPayload.Expires,
+		"Token": token,
+		"Refresh": refresh,
+	})
+
 	return result, nil
 }
 
 func (s *authService) Refresh(ctx context.Context, refreshToken string) (dto.LoginRes, error) {
+	timeNow := utils.NowWIB()
+
 	tokenData, err := redis.GetRefreshToken(ctx, s.redis, refreshToken)
 	if err != nil {
-		return dto.LoginRes{}, fmt.Errorf("invalid or expired refresh token")
+		return dto.LoginRes{}, fmt.Errorf("invalid or expired refresh token: %w", err)
 	}
 
 	nonce := utils.GenerateRandomString(redis.TokenLen)
@@ -111,8 +118,8 @@ func (s *authService) Refresh(ctx context.Context, refreshToken string) (dto.Log
 		Account:     tokenData.Account,
 		Permissions: tokenData.Permissions,
 		Email:       tokenData.Account.Email,
-		IssuedAt:    fmt.Sprintf("%d", time.Now().Unix()),
-		Expires:     fmt.Sprintf("%d", time.Now().Add(redis.TokenAuthSessionExp).Unix()),
+		IssuedAt:    fmt.Sprintf("%d", timeNow.Unix()),
+		Expires:     fmt.Sprintf("%d", timeNow.Add(redis.TokenAuthRefreshExp).Unix()),
 		Issuer:      "hris-backend",
 		Subject:     fmt.Sprintf("%d", tokenData.Account.AccountID),
 		Nonce:       nonce,

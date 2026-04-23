@@ -439,11 +439,17 @@ func (s *attendanceService) GetMetadata(ctx context.Context) (dto.AttendanceMeta
 		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch employee meta: %w", err)
 	}
 
+	branchMeta, err := s.repo.GetBranchMetaList(ctx, nil)
+	if err != nil {
+		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch branch meta: %w", err)
+	}
+
 	return dto.AttendanceMetadata{
 		StatusMeta:       data.AttendanceStatusMeta,
 		ClockMethodMeta:  data.ClockMethodMeta,
 		OverrideTypeMeta: data.OverrideTypeMeta,
 		EmployeeMeta:     empMeta,
+		BranchMeta:       branchMeta,
 	}, nil
 }
 

@@ -53,4 +53,5 @@ type AttendanceMetadata struct {
 	ClockMethodMeta  []Meta `json:"clock_method_meta"`
 	OverrideTypeMeta []Meta `json:"override_type_meta"`
 	EmployeeMeta     []Meta `json:"employee_meta"`
+	BranchMeta       []Meta `json:"branch_meta"`
 }
