@@ -95,10 +95,13 @@ func (r *employeeRepository) GetDepartmentMetadata(ctx context.Context, tx Trans
 	var departmentMeta []dto.Meta
 	if err := db.Raw(`
 		SELECT
-			id::TEXT AS id,
-			name
-		FROM departments
-		WHERE deleted_at IS NULL
+			b.id::TEXT AS parent_id,
+			d.id::TEXT AS id,
+			d.name
+		FROM departments d
+		JOIN branches b ON b.id = d.branch_id
+		WHERE d.deleted_at IS NULL AND b.deleted_at IS NULL
+		ORDER BY d.name ASC
 	`).Scan(&departmentMeta).Error; err != nil {
 		return nil, err
 	}
@@ -135,10 +138,12 @@ func (r *employeeRepository) GetJobPositionMetadata(ctx context.Context, tx Tran
 	var jobPositionMeta []dto.Meta
 	if err := db.Raw(`
 		SELECT
-			id::TEXT AS id,
-			title as name
-		FROM job_positions
-		WHERE deleted_at IS NULL
+			d.id::TEXT AS parent_id,
+			jp.id::TEXT AS id,
+			jp.title as name
+		FROM job_positions jp
+		JOIN departments d ON d.id = jp.department_id
+		WHERE jp.deleted_at IS NULL AND d.deleted_at IS NULL
 	`).Scan(&jobPositionMeta).Error; err != nil {
 		return nil, err
 	}

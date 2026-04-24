@@ -30,10 +30,14 @@ func NewPositionRepository(db *gorm.DB) PositionRepository {
 func (r *positionRepository) GetDepartmentMetadata(ctx context.Context) ([]dto.Meta, error) {
 	var meta []dto.Meta
 	if err := r.db.WithContext(ctx).Raw(`
-		SELECT id::TEXT AS id, name
-		FROM departments
-		WHERE deleted_at IS NULL
-		ORDER BY name ASC
+		SELECT
+			b.id::TEXT AS parent_id,
+			d.id::TEXT AS id,
+			d.name
+		FROM departments d
+		JOIN branches b ON b.id = d.branch_id
+		WHERE d.deleted_at IS NULL AND b.deleted_at IS NULL
+		ORDER BY d.name ASC
 	`).Scan(&meta).Error; err != nil {
 		return nil, err
 	}

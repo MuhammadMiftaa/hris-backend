@@ -13,6 +13,7 @@ type UserData struct {
 }
 
 type Meta struct {
-	ID   string `json:"id" db:"id"`
-	Name string `json:"name" db:"name"`
+	ParentID *string `json:"parent_id,omitempty" db:"parent_id"`
+	ID       string  `json:"id" db:"id"`
+	Name     string  `json:"name" db:"name"`
 }
