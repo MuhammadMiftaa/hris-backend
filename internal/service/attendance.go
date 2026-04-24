@@ -75,6 +75,18 @@ func (s *attendanceService) GetPhotoURL(ctx context.Context, objectKey string) (
 	return url, nil
 }
 
+// resolveAttendancePhotoURL converts raw MinIO object key to presigned download URL
+func (s *attendanceService) resolveAttendancePhotoURL(ctx context.Context, objectKey *string) *string {
+	if objectKey == nil || *objectKey == "" {
+		return nil
+	}
+	url, err := s.minio.PresignedGetObject(ctx, storage.BucketAttendance, *objectKey, storage.PresignedDownloadExpiry)
+	if err != nil {
+		return nil
+	}
+	return &url
+}
+
 func (s *attendanceService) GetTodayStatus(ctx context.Context, employeeID uint) (dto.AttendanceTodayResponse, error) {
 	today := utils.TodayDate()
 
@@ -430,7 +442,18 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 }
 
 func (s *attendanceService) GetAllLogs(ctx context.Context, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error) {
-	return s.repo.GetAllLogs(ctx, nil, params)
+	logs, err := s.repo.GetAllLogs(ctx, nil, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve presigned URLs for photo fields
+	for i := range logs {
+		logs[i].ClockInPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockInPhotoURL)
+		logs[i].ClockOutPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockOutPhotoURL)
+	}
+
+	return logs, nil
 }
 
 func (s *attendanceService) GetMetadata(ctx context.Context) (dto.AttendanceMetadata, error) {

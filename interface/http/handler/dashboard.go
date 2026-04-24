@@ -48,3 +48,35 @@ func (h *DashboardHandler) GetHRDDashboard(c *fiber.Ctx) error {
 		Data:       res,
 	})
 }
+
+// GetRankings — GET /dashboard/rankings
+func (h *DashboardHandler) GetRankings(c *fiber.Ctx) error {
+	res, err := h.service.GetRankings(c.Context())
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "dashboard rankings",
+		Data:       res,
+	})
+}
+
+// GetMetadata — GET /dashboard/metadata
+func (h *DashboardHandler) GetMetadata(c *fiber.Ctx) error {
+	account := getAccountFromCtx(c)
+
+	res, err := h.service.GetDashboardMetadata(c.Context(), account.EmployeeID)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "dashboard metadata",
+		Data:       res,
+	})
+}

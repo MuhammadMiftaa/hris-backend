@@ -1,6 +1,7 @@
 package route
 
 import (
+	"hris-backend/config/storage"
 	"hris-backend/interface/http/handler"
 	"hris-backend/interface/http/middleware"
 	"hris-backend/internal/repository"
@@ -11,10 +12,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func EmployeeRoutes(app *fiber.App, db *gorm.DB) {
+func EmployeeRoutes(app *fiber.App, db *gorm.DB, minioClient storage.MinioClient) {
 	repo := repository.NewEmployeeRepository(db)
 	txManager := repository.NewTxManager(db)
-	h := handler.NewEmployeeHandler(service.NewEmployeeService(repo, txManager))
+	h := handler.NewEmployeeHandler(service.NewEmployeeService(repo, txManager, minioClient))
 
 	employees := app.Group("/employees")
 	{

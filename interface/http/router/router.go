@@ -54,7 +54,7 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, mi
 	// ── Protected Routes ──────────────────────────────────────────
 	app.Use(middleware.AuthMiddleware(redisInstance))
 
-	route.EmployeeRoutes(app, dbInstance.GetDB())
+	route.EmployeeRoutes(app, dbInstance.GetDB(), minioClient)
 	route.BranchRoutes(app, dbInstance.GetDB())
 	route.DepartmentRoutes(app, dbInstance.GetDB())
 	route.PositionRoutes(app, dbInstance.GetDB())

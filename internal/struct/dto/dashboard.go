@@ -107,3 +107,36 @@ type HRDDashboardResponse struct {
 	NotClockedIn      []NotClockedInDTO        `json:"not_clocked_in"`
 	ExpiringContracts []ExpiringContractDTO    `json:"expiring_contracts"`
 }
+
+// RankingEntryDTO — satu entry ranking generik
+type RankingEntryDTO struct {
+	Rank           int     `json:"rank"`
+	EmployeeID     uint    `json:"employee_id"`
+	EmployeeName   string  `json:"employee_name"`
+	EmployeeNumber string  `json:"employee_number"`
+	Value          float64 `json:"value"`
+	ValueLabel     string  `json:"value_label"` // "64m", "150 hal", dsb
+}
+
+// DepartmentRankingDTO — ranking per departemen
+type DepartmentRankingDTO struct {
+	Rank           int     `json:"rank"`
+	DepartmentID   uint    `json:"department_id"`
+	DepartmentName string  `json:"department_name"`
+	Value          float64 `json:"value"`
+	ValueLabel     string  `json:"value_label"` // "95%", dsb
+}
+
+// DashboardRankingsResponse — 3 ranking sekaligus
+type DashboardRankingsResponse struct {
+	FastestArrival []RankingEntryDTO      `json:"fastest_arrival"`
+	TopTilawah     []DepartmentRankingDTO `json:"top_tilawah"`
+	MostLate       []RankingEntryDTO      `json:"most_late"`
+}
+
+// DashboardMetadataResponse — return used by Dashboard Quick Requests Modal
+type DashboardMetadataResponse struct {
+	LeaveTypeMeta        []Meta `json:"leave_type_meta"`
+	RecentAttendanceMeta []Meta `json:"recent_attendance_meta"`
+}
+

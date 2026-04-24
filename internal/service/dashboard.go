@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"hris-backend/internal/repository"
@@ -12,6 +13,8 @@ import (
 type DashboardService interface {
 	GetEmployeeDashboard(ctx context.Context, accountID uint, isTrainer bool) (dto.EmployeeDashboardResponse, error)
 	GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error)
+	GetRankings(ctx context.Context) (dto.DashboardRankingsResponse, error)
+	GetDashboardMetadata(ctx context.Context, employeeID uint) (dto.DashboardMetadataResponse, error)
 }
 
 type dashboardService struct {
@@ -145,5 +148,62 @@ func (s *dashboardService) GetHRDDashboard(ctx context.Context, hrID uint) (dto.
 		TeamMutabaah:      teamMutabaah,
 		NotClockedIn:      notClockedIn,
 		ExpiringContracts: expiring,
+	}, nil
+}
+
+func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankingsResponse, error) {
+	now := time.Now()
+	year, month, _ := now.Date()
+
+	fastest, err := s.dashboardRepo.GetFastestArrivalRanking(ctx, year, int(month), 5)
+	if err != nil {
+		log.Printf("[WARN] GetFastestArrivalRanking failed: %v", err)
+	}
+	tilawah, err := s.dashboardRepo.GetTopTilawahByDepartment(ctx, year, int(month), 5)
+	if err != nil {
+		log.Printf("[WARN] GetTopTilawahByDepartment failed: %v", err)
+	}
+	mostLate, err := s.dashboardRepo.GetMostLateRanking(ctx, year, int(month), 5)
+	if err != nil {
+		log.Printf("[WARN] GetMostLateRanking failed: %v", err)
+	}
+
+	if fastest == nil {
+		fastest = []dto.RankingEntryDTO{}
+	}
+	if tilawah == nil {
+		tilawah = []dto.DepartmentRankingDTO{}
+	}
+	if mostLate == nil {
+		mostLate = []dto.RankingEntryDTO{}
+	}
+
+	return dto.DashboardRankingsResponse{
+		FastestArrival: fastest,
+		TopTilawah:     tilawah,
+		MostLate:       mostLate,
+	}, nil
+}
+
+func (s *dashboardService) GetDashboardMetadata(ctx context.Context, employeeID uint) (dto.DashboardMetadataResponse, error) {
+	leaveTypeMeta, err := s.dashboardRepo.GetLeaveTypeMeta(ctx)
+	if err != nil {
+		log.Printf("[WARN] GetLeaveTypeMeta failed: %v", err)
+	}
+	recentAttendanceMeta, err := s.dashboardRepo.GetRecentAttendanceMeta(ctx, employeeID)
+	if err != nil {
+		log.Printf("[WARN] GetRecentAttendanceMeta failed: %v", err)
+	}
+
+	if leaveTypeMeta == nil {
+		leaveTypeMeta = []dto.Meta{}
+	}
+	if recentAttendanceMeta == nil {
+		recentAttendanceMeta = []dto.Meta{}
+	}
+
+	return dto.DashboardMetadataResponse{
+		LeaveTypeMeta:        leaveTypeMeta,
+		RecentAttendanceMeta: recentAttendanceMeta,
 	}, nil
 }

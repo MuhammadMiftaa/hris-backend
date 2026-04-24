@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"hris-backend/config/storage"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -38,13 +39,27 @@ type EmployeeService interface {
 type employeeService struct {
 	repo      repository.EmployeeRepository
 	txManager repository.TxManager
+	minio     storage.MinioClient
 }
 
-func NewEmployeeService(repo repository.EmployeeRepository, txManager repository.TxManager) EmployeeService {
+func NewEmployeeService(repo repository.EmployeeRepository, txManager repository.TxManager, minio storage.MinioClient) EmployeeService {
 	return &employeeService{
 		repo:      repo,
 		txManager: txManager,
+		minio:     minio,
 	}
+}
+
+// resolvePhotoURL converts raw MinIO object key to presigned download URL
+func (s *employeeService) resolvePhotoURL(ctx context.Context, objectKey *string) *string {
+	if objectKey == nil || *objectKey == "" {
+		return nil
+	}
+	url, err := s.minio.PresignedGetObject(ctx, storage.BucketProfilePhotos, *objectKey, storage.PresignedDownloadExpiry)
+	if err != nil {
+		return nil
+	}
+	return &url
 }
 
 func (s *employeeService) GetMetadata(ctx context.Context) (dto.EmployeeMetadata, error) {
@@ -87,6 +102,12 @@ func (s *employeeService) GetAllEmployees(ctx context.Context) ([]dto.Employee, 
 	if err != nil {
 		return nil, fmt.Errorf("get all employees: %w", err)
 	}
+
+	// Resolve presigned URLs for photo_url
+	for i := range employees {
+		employees[i].PhotoURL = s.resolvePhotoURL(ctx, employees[i].PhotoURL)
+	}
+
 	return employees, nil
 }
 
@@ -95,6 +116,10 @@ func (s *employeeService) GetEmployeeByID(ctx context.Context, employeeID string
 	if err != nil {
 		return dto.Employee{}, fmt.Errorf("get employee by ID: %w", err)
 	}
+
+	// Resolve presigned URL for photo_url
+	employee.PhotoURL = s.resolvePhotoURL(ctx, employee.PhotoURL)
+
 	return employee, nil
 }
 
@@ -143,7 +168,7 @@ func (s *employeeService) CreateEmployee(ctx context.Context, req dto.CreateEmpl
 		MaritalStatus:  createdEmployee.MaritalStatus,
 		BloodType:      createdEmployee.BloodType,
 		Nationality:    createdEmployee.Nationality,
-		PhotoURL:       createdEmployee.PhotoURL,
+		PhotoURL:       s.resolvePhotoURL(ctx, createdEmployee.PhotoURL),
 		IsActive:       createdAccount.IsActive,
 		IsTrainer:      createdEmployee.IsTrainer,
 		BranchID:       createdEmployee.BranchID,
@@ -210,7 +235,7 @@ func (s *employeeService) UpdateEmployee(ctx context.Context, id string, req dto
 		MaritalStatus:  updatedEmployee.MaritalStatus,
 		BloodType:      updatedEmployee.BloodType,
 		Nationality:    updatedEmployee.Nationality,
-		PhotoURL:       updatedEmployee.PhotoURL,
+		PhotoURL:       s.resolvePhotoURL(ctx, updatedEmployee.PhotoURL),
 		IsActive:       existingEmployee.IsActive,
 		IsTrainer:      updatedEmployee.IsTrainer,
 		BranchID:       updatedEmployee.BranchID,
