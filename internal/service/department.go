@@ -56,7 +56,6 @@ func (s *departmentService) CreateDepartment(ctx context.Context, req dto.Create
 		Name:        req.Name,
 		BranchID:    req.BranchID,
 		Description: req.Description,
-		IsActive:    true,
 	}
 
 	created, err := s.repo.CreateDepartment(ctx, dept)
@@ -79,7 +78,7 @@ func (s *departmentService) UpdateDepartment(ctx context.Context, id string, req
 		dept.Description = req.Description
 	}
 	if req.IsActive != nil {
-		dept.IsActive = *req.IsActive
+		dept.IsActive = req.IsActive
 	}
 
 	_, err := s.repo.UpdateDepartment(ctx, id, dept)

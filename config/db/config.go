@@ -53,7 +53,9 @@ func NewDatabaseClient(cfg env.Database, poolCfg ConnectionPoolConfig) (Database
 		cfg.DBPort,
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: log.SetupGormLogger(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

@@ -213,7 +213,7 @@ func (s *shiftService) CreateSchedule(ctx context.Context, req dto.CreateSchedul
 		EmployeeID:      req.EmployeeID,
 		ShiftTemplateID: req.ShiftTemplateID,
 		EffectiveDate:   effectiveDate,
-		IsActive:        req.IsActive,
+		IsActive:        &req.IsActive,
 	}
 
 	if req.EndDate != nil {
@@ -241,7 +241,7 @@ func (s *shiftService) UpdateSchedule(ctx context.Context, id uint, req dto.Upda
 	updateModel := model.EmployeeSchedule{
 		EmployeeID:      existing.EmployeeID,
 		ShiftTemplateID: existing.ShiftTemplateID,
-		IsActive:        existing.IsActive,
+		IsActive:        &existing.IsActive,
 	}
 
 	effDate, err := time.Parse("2006-01-02", existing.EffectiveDate)
@@ -256,7 +256,7 @@ func (s *shiftService) UpdateSchedule(ctx context.Context, id uint, req dto.Upda
 		updateModel.ShiftTemplateID = *req.ShiftTemplateID
 	}
 	if req.IsActive != nil {
-		updateModel.IsActive = *req.IsActive
+		updateModel.IsActive = req.IsActive
 	}
 	if req.EffectiveDate != nil {
 		d, err := time.Parse("2006-01-02", *req.EffectiveDate)
@@ -362,7 +362,7 @@ func (s *shiftService) buildDetails(templateID uint, reqs []dto.CreateShiftDetai
 		details = append(details, model.ShiftTemplateDetail{
 			ShiftTemplateID: templateID,
 			DayOfWeek:       model.DayOfWeekEnum(d.DayOfWeek),
-			IsWorkingDay:    d.IsWorkingDay,
+			IsWorkingDay:    &d.IsWorkingDay,
 			ClockInStart:    d.ClockInStart,
 			ClockInEnd:      d.ClockInEnd,
 			BreakDhuhrStart: d.BreakDhuhrStart,

@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"hris-backend/internal/utils/data"
 
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm/logger"
 )
 
 // ApacheStyleFormatter — custom formatter with Apache/Nginx style and color support.
@@ -201,4 +203,79 @@ func Trace(msg string, fields ...map[string]any) {
 		entry = Log.WithFields(logrus.Fields(fields[0]))
 	}
 	entry.Trace(msg)
+}
+
+type GormLogger struct {
+	SlowThreshold time.Duration
+	LogLevel      logger.LogLevel
+}
+
+func SetupGormLogger() *GormLogger {
+	level := logger.Info // default
+
+	switch env.Cfg.Server.Mode {
+	case data.PRODUCTION_MODE:
+		level = logger.Error // production: hanya error
+	case data.STAGING_MODE:
+		level = logger.Warn // staging: error + slow query
+	default:
+		level = logger.Info // development: semua query
+	}
+
+	return &GormLogger{
+		SlowThreshold: 200 * time.Millisecond,
+		LogLevel:      level,
+	}
+}
+
+func (g *GormLogger) LogMode(level logger.LogLevel) logger.Interface {
+	g.LogLevel = level
+	return g
+}
+
+func (g *GormLogger) Info(ctx context.Context, msg string, args ...any) {
+	if g.LogLevel >= logger.Info {
+		Info(fmt.Sprintf(msg, args...))
+	}
+}
+
+func (g *GormLogger) Warn(ctx context.Context, msg string, args ...any) {
+	if g.LogLevel >= logger.Warn {
+		Warn(fmt.Sprintf(msg, args...))
+	}
+}
+
+func (g *GormLogger) Error(ctx context.Context, msg string, args ...any) {
+	if g.LogLevel >= logger.Error {
+		Error(fmt.Sprintf(msg, args...))
+	}
+}
+
+func (g *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
+	if g.LogLevel <= logger.Silent {
+		return
+	}
+
+	elapsed := time.Since(begin)
+	sql, rows := fc()
+
+	fields := map[string]any{
+		"rows":    rows,
+		"elapsed": elapsed.String(),
+	}
+
+	switch {
+	case err != nil && g.LogLevel >= logger.Error:
+		Error(sql, map[string]any{
+			"rows":    rows,
+			"elapsed": elapsed.String(),
+			"error":   err.Error(),
+		})
+
+	case elapsed > g.SlowThreshold && g.LogLevel >= logger.Warn:
+		Warn(fmt.Sprintf("SLOW SQL >= %v | %s", g.SlowThreshold, sql), fields)
+
+	case g.LogLevel >= logger.Info:
+		Info(sql, fields)
+	}
 }

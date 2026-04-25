@@ -169,7 +169,7 @@ func (s *employeeService) CreateEmployee(ctx context.Context, req dto.CreateEmpl
 		BloodType:      createdEmployee.BloodType,
 		Nationality:    createdEmployee.Nationality,
 		PhotoURL:       s.resolvePhotoURL(ctx, createdEmployee.PhotoURL),
-		IsActive:       createdAccount.IsActive,
+		IsActive:       *createdAccount.IsActive,
 		IsTrainer:      createdEmployee.IsTrainer,
 		BranchID:       createdEmployee.BranchID,
 		DepartmentID:   createdEmployee.DepartmentID,
@@ -206,14 +206,14 @@ func (s *employeeService) UpdateEmployee(ctx context.Context, id string, req dto
 			return dto.Employee{}, fmt.Errorf("update employee: get existing account: %w", err)
 		}
 
-		existingAccount.IsActive = req.IsActive
+		existingAccount.IsActive = &req.IsActive
 		existingAccount.RoleID = *req.RoleID
 		updatedAccount, err := s.repo.UpdateAccount(ctx, tx, existingAccount)
 		if err != nil {
 			return dto.Employee{}, fmt.Errorf("update employee: update account: %w", err)
 		}
 
-		existingEmployee.IsActive = updatedAccount.IsActive
+		existingEmployee.IsActive = *updatedAccount.IsActive
 		existingEmployee.RoleID = &updatedAccount.RoleID
 	}
 
@@ -340,7 +340,6 @@ func (s *employeeService) validateAccountPayload(employee model.Employee, req dt
 			RoleID:     *req.RoleID,
 			Email:      email,
 			Password:   hashPassword,
-			IsActive:   true,
 		}, dto.NewEmployeeCred{
 			Email:    email,
 			Password: randomPassword,
