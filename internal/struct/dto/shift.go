@@ -8,19 +8,21 @@ type ShiftTemplateRow struct {
 	ID         uint       `gorm:"column:id"`
 	Name       string     `gorm:"column:name"`
 	IsFlexible bool       `gorm:"column:is_flexible"`
+	CanWFA     bool       `gorm:"column:can_wfa"`
 	CreatedAt  time.Time  `gorm:"column:created_at"`
 	UpdatedAt  *time.Time `gorm:"column:updated_at"`
 	DeletedAt  *time.Time `gorm:"column:deleted_at"`
 }
 
 type ShiftTemplateResponse struct {
-	ID         uint                       `json:"id"`
-	Name       string                     `json:"name"`
-	IsFlexible bool                       `json:"is_flexible"`
-	Details    []ShiftTemplateDetailResp  `json:"details"`
-	CreatedAt  time.Time                  `json:"created_at"`
-	UpdatedAt  *time.Time                 `json:"updated_at"`
-	DeletedAt  *time.Time                 `json:"deleted_at"`
+	ID         uint                      `json:"id"`
+	Name       string                    `json:"name"`
+	IsFlexible bool                      `json:"is_flexible"`
+	CanWFA     bool                      `json:"can_wfa"`
+	Details    []ShiftTemplateDetailResp `json:"details"`
+	CreatedAt  time.Time                 `json:"created_at"`
+	UpdatedAt  *time.Time                `json:"updated_at"`
+	DeletedAt  *time.Time                `json:"deleted_at"`
 }
 
 type ShiftTemplateDetailResp struct {
@@ -82,12 +84,14 @@ type CreateShiftDetailRequest struct {
 type CreateShiftRequest struct {
 	Name       string                     `json:"name"`
 	IsFlexible bool                       `json:"is_flexible"`
+	CanWFA     bool                       `json:"can_wfa"`
 	Details    []CreateShiftDetailRequest `json:"details"`
 }
 
 type UpdateShiftRequest struct {
 	Name       *string                    `json:"name"`
 	IsFlexible *bool                      `json:"is_flexible"`
+	CanWFA     *bool                      `json:"can_wfa"`
 	Details    []CreateShiftDetailRequest `json:"details"`
 }
 
@@ -118,6 +122,7 @@ type TodayScheduleResponse struct {
 	IsWorkingDay  bool    `json:"is_working_day"`
 	Reason        string  `json:"reason,omitempty"`
 	ShiftName     *string `json:"shift_name,omitempty"`
+	CanWFA        bool    `json:"can_wfa"`
 	ClockInStart  *string `json:"clock_in_start,omitempty"`
 	ClockInEnd    *string `json:"clock_in_end,omitempty"`
 	ClockOutStart *string `json:"clock_out_start,omitempty"`

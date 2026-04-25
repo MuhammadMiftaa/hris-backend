@@ -67,7 +67,7 @@ func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transacti
 
 	var rows []dto.ShiftTemplateRow
 	if err := db.Raw(`
-		SELECT id, name, is_flexible, created_at, updated_at, deleted_at
+		SELECT id, name, is_flexible, can_wfa, created_at, updated_at, deleted_at
 		FROM shift_templates
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -85,6 +85,7 @@ func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transacti
 			ID:         row.ID,
 			Name:       row.Name,
 			IsFlexible: row.IsFlexible,
+			CanWFA:     row.CanWFA,
 			Details:    details,
 			CreatedAt:  row.CreatedAt,
 			UpdatedAt:  row.UpdatedAt,
@@ -103,7 +104,7 @@ func (r *shiftRepository) GetShiftTemplateByID(ctx context.Context, tx Transacti
 
 	var row dto.ShiftTemplateRow
 	if err := db.Raw(`
-		SELECT id, name, is_flexible, created_at, updated_at, deleted_at
+		SELECT id, name, is_flexible, can_wfa, created_at, updated_at, deleted_at
 		FROM shift_templates
 		WHERE deleted_at IS NULL AND id = ?
 	`, id).Scan(&row).Error; err != nil {
@@ -122,6 +123,7 @@ func (r *shiftRepository) GetShiftTemplateByID(ctx context.Context, tx Transacti
 		ID:         row.ID,
 		Name:       row.Name,
 		IsFlexible: row.IsFlexible,
+		CanWFA:     row.CanWFA,
 		Details:    details,
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
@@ -150,6 +152,7 @@ func (r *shiftRepository) UpdateShiftTemplate(ctx context.Context, tx Transactio
 	if err := db.Model(&m).Where("id = ?", id).Updates(map[string]interface{}{
 		"name":        m.Name,
 		"is_flexible": m.IsFlexible,
+		"can_wfa":     m.CanWFA,
 	}).Error; err != nil {
 		return model.ShiftTemplate{}, err
 	}
@@ -375,6 +378,7 @@ func (r *shiftRepository) GetTodayScheduleForEmployee(ctx context.Context, tx Tr
 		ShiftTemplateID uint    `db:"shift_template_id"`
 		ShiftName       string  `db:"shift_name"`
 		IsFlexible      bool    `db:"is_flexible"`
+		CanWFA          bool    `db:"can_wfa"`
 		DayOfWeek       string  `db:"day_of_week"`
 		IsWorkingDay    bool    `db:"is_working_day"`
 		ClockInStart    *string `db:"clock_in_start"`
@@ -389,6 +393,7 @@ func (r *shiftRepository) GetTodayScheduleForEmployee(ctx context.Context, tx Tr
 			st.id                              AS shift_template_id,
 			st.name                            AS shift_name,
 			st.is_flexible,
+			st.can_wfa,
 			LOWER(TRIM(TO_CHAR($2::DATE, 'Day'))) AS day_of_week,
 			COALESCE(std.is_working_day, TRUE) AS is_working_day,
 			std.clock_in_start::TEXT           AS clock_in_start,
@@ -421,6 +426,7 @@ func (r *shiftRepository) GetTodayScheduleForEmployee(ctx context.Context, tx Tr
 		ShiftTemplateID: ctx2.ShiftTemplateID,
 		ShiftName:       ctx2.ShiftName,
 		IsFlexible:      ctx2.IsFlexible,
+		CanWFA:          ctx2.CanWFA,
 		DayOfWeek:       ctx2.DayOfWeek,
 		IsWorkingDay:    ctx2.IsWorkingDay,
 		ClockInStart:    ctx2.ClockInStart,

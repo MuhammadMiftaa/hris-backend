@@ -269,12 +269,12 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 		return nil, err
 	}
 
-	// day_of_week sesuai hari tanggal yang diminta
 	var ctx2 struct {
 		ScheduleID      uint    `db:"schedule_id"`
 		ShiftTemplateID uint    `db:"shift_template_id"`
 		ShiftName       string  `db:"shift_name"`
 		IsFlexible      bool    `db:"is_flexible"`
+		CanWFA          bool    `db:"can_wfa"`
 		DayOfWeek       string  `db:"day_of_week"`
 		IsWorkingDay    bool    `db:"is_working_day"`
 		ClockInStart    *string `db:"clock_in_start"`
@@ -282,13 +282,14 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 		ClockOutStart   *string `db:"clock_out_start"`
 		ClockOutEnd     *string `db:"clock_out_end"`
 	}
-
+ 
 	err = db.Raw(`
 		SELECT
 			es.id                              AS schedule_id,
 			st.id                              AS shift_template_id,
 			st.name                            AS shift_name,
 			st.is_flexible,
+			st.can_wfa,
 			LOWER(TRIM(TO_CHAR($2::DATE, 'Day'))) AS day_of_week,
 			COALESCE(std.is_working_day, TRUE) AS is_working_day,
 			std.clock_in_start::TEXT           AS clock_in_start,
@@ -321,6 +322,7 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 		ShiftTemplateID: ctx2.ShiftTemplateID,
 		ShiftName:       ctx2.ShiftName,
 		IsFlexible:      ctx2.IsFlexible,
+		CanWFA:          ctx2.CanWFA,
 		DayOfWeek:       ctx2.DayOfWeek,
 		IsWorkingDay:    ctx2.IsWorkingDay,
 		ClockInStart:    ctx2.ClockInStart,
