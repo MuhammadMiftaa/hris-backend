@@ -40,6 +40,7 @@ type GetEmployeeByIDResponse struct {
 	DepartmentID   *uint          `json:"department_id" gorm:"column:department_id"`
 	JobPositionsID *uint          `json:"job_positions_id" gorm:"column:job_positions_id"`
 	RoleName       string         `json:"role_name" gorm:"column:role_name"`
+	RoleLevel      string         `json:"role_level" gorm:"column:role_level"`
 	Permissions    datatypes.JSON `json:"permissions,omitempty" gorm:"column:permissions"`
 }
 

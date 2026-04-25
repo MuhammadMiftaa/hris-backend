@@ -25,8 +25,23 @@ type AttendanceService interface {
 	CreateManualAttendance(ctx context.Context, employeeID uint, req dto.CreateManualAttendanceRequest) (dto.AttendanceLogResponse, error)
 	GetAllOverrides(ctx context.Context, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error)
 	GetOverrideByID(ctx context.Context, id uint) (dto.AttendanceOverrideResponse, error)
-	CreateOverride(ctx context.Context, employeeID uint, req dto.CreateOverrideRequest) (dto.AttendanceOverrideResponse, error)
-	UpdateOverrideStatus(ctx context.Context, employeeID uint, id uint, req dto.UpdateOverrideStatusRequest) (dto.AttendanceOverrideResponse, error)
+	CreateOverride(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateOverrideRequest) (dto.AttendanceOverrideResponse, error)
+	UpdateOverrideStatus(ctx context.Context, employeeID uint, roleLevel string, id uint, req dto.UpdateOverrideStatusRequest) (dto.AttendanceOverrideResponse, error)
+}
+
+func getRoleWeight(level string) int {
+	switch level {
+	case "superadmin":
+		return 4
+	case "admin":
+		return 3
+	case "manager":
+		return 2
+	case "staff":
+		return 1
+	default:
+		return 0
+	}
 }
 
 type attendanceService struct {
@@ -608,7 +623,7 @@ func (s *attendanceService) GetOverrideByID(ctx context.Context, id uint) (dto.A
 	return *res, nil
 }
 
-func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint, req dto.CreateOverrideRequest) (dto.AttendanceOverrideResponse, error) {
+func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateOverrideRequest) (dto.AttendanceOverrideResponse, error) {
 	attendanceLog, err := s.repo.GetLogByID(ctx, nil, req.AttendanceLogID)
 	if err != nil || attendanceLog == nil {
 		return dto.AttendanceOverrideResponse{}, fmt.Errorf("attendance log not found: %w", err)
@@ -656,6 +671,13 @@ func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint,
 		return dto.AttendanceOverrideResponse{}, err
 	}
 
+	// Auto-approve jika admin/superadmin — panggil UpdateOverrideStatus secara normal
+	if roleLevel == "superadmin" || roleLevel == "admin" {
+		return s.UpdateOverrideStatus(ctx, employeeID, roleLevel, created.ID, dto.UpdateOverrideStatusRequest{
+			Status: "approved",
+		})
+	}
+
 	res, err := s.repo.GetOverrideByID(ctx, nil, created.ID)
 	if err != nil {
 		return dto.AttendanceOverrideResponse{}, err
@@ -663,13 +685,24 @@ func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint,
 	return *res, nil
 }
 
-func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID uint, id uint, req dto.UpdateOverrideStatusRequest) (dto.AttendanceOverrideResponse, error) {
+func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID uint, roleLevel string, id uint, req dto.UpdateOverrideStatusRequest) (dto.AttendanceOverrideResponse, error) {
 	ov, err := s.repo.GetOverrideByID(ctx, nil, id)
 	if err != nil {
 		return dto.AttendanceOverrideResponse{}, err
 	}
 	if ov.Status != string(model.RequestStatusPending) {
 		return dto.AttendanceOverrideResponse{}, fmt.Errorf("override is no longer pending")
+	}
+
+	if roleLevel != "superadmin" && roleLevel != "admin" {
+		reqLevelStr, e := s.repo.GetEmployeeRoleLevel(ctx, nil, ov.RequestedBy)
+		if e != nil {
+			return dto.AttendanceOverrideResponse{}, fmt.Errorf("failed to check requester rank: %w", e)
+		}
+		
+		if getRoleWeight(roleLevel) <= getRoleWeight(reqLevelStr) {
+			return dto.AttendanceOverrideResponse{}, fmt.Errorf("unauthorized: you can only approve requests from lower rank employee")
+		}
 	}
 
 	tx, err := s.txManager.Begin(ctx)

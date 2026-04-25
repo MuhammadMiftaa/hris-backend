@@ -75,7 +75,7 @@ func (h *PermissionRequestHandler) Create(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.Create(c.Context(), account.EmployeeID, req)
+	res, err := h.service.Create(c.Context(), account.EmployeeID, account.RoleLevel, req)
 	if err != nil {
 		return respondError(c, err)
 	}

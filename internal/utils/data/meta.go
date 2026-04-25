@@ -140,6 +140,13 @@ var (
 		{ID: "sunday", Name: "Minggu"},
 	}
 
+	RoleLevelMeta = []dto.Meta{
+		{ID: "superadmin", Name: "Super Admin"},
+		{ID: "admin", Name: "Admin"},
+		{ID: "manager", Name: "Manager"},
+		{ID: "staff", Name: "Staff"},
+	}
+
 	PermissionModuleMeta = []dto.Meta{
 		{ID: "home", Name: "Home"},
 		{ID: "employee", Name: "Pegawai"},
@@ -221,7 +228,8 @@ var (
 
 	OvertimeStatusMeta = []dto.Meta{
 		{ID: "pending", Name: "Menunggu"},
-		{ID: "approved", Name: "Disetujui"},
+		{ID: "approved_leader", Name: "Disetujui Leader"},
+		{ID: "approved_hr", Name: "Disetujui HR"},
 		{ID: "rejected", Name: "Ditolak"},
 	}
 

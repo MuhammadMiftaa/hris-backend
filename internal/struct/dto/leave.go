@@ -52,6 +52,7 @@ type LeaveApprovalResponse struct {
 }
 
 type CreateLeaveRequest struct {
+	EmployeeID  *uint   `json:"employee_id"`
 	LeaveTypeID uint    `json:"leave_type_id"`
 	StartDate   string  `json:"start_date"`
 	EndDate     string  `json:"end_date"`

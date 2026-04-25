@@ -22,6 +22,7 @@ type PermissionRequestResponse struct {
 }
 
 type CreatePermissionRequest struct {
+	EmployeeID     *uint   `json:"employee_id"`
 	Date           string  `json:"date"`
 	PermissionType string  `json:"permission_type"`
 	LeaveTime      *string `json:"leave_time"`

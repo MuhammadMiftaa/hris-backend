@@ -86,6 +86,7 @@ func (r *authRepository) GetEmployeeByID(ctx context.Context, tx Transaction, id
             COALESCE(e.department_id, 0) AS department_id,
             COALESCE(e.job_positions_id, 0) AS job_positions_id,
             COALESCE(r.name, '') AS role_name,
+            COALESCE(r.level::TEXT, 'staff') AS role_level,
             COALESCE(
                 JSONB_AGG(DISTINCT p.code ORDER BY p.code ASC) FILTER (WHERE p.code IS NOT NULL), 
                 '[]'::jsonb
@@ -100,7 +101,7 @@ func (r *authRepository) GetEmployeeByID(ctx context.Context, tx Transaction, id
             a.id, a.email, a.is_active, a.last_login_at,
             e.id, e.employee_number, e.full_name, e.photo_url, 
             e.is_trainer, e.branch_id, e.department_id, e.job_positions_id,
-            r.id, r.name
+            r.id, r.name, r.level
     `, id).Scan(&user).Error
 	if err != nil {
 		return user, err

@@ -16,7 +16,7 @@ type LeaveService interface {
 	GetAllBalances(ctx context.Context, params dto.LeaveBalanceListParams) ([]dto.LeaveBalanceResponse, error)
 	GetAllRequests(ctx context.Context, params dto.LeaveRequestListParams) ([]dto.LeaveRequestResponse, error)
 	GetRequestByID(ctx context.Context, id uint) (dto.LeaveRequestResponse, error)
-	CreateRequest(ctx context.Context, employeeID uint, req dto.CreateLeaveRequest) (dto.LeaveRequestResponse, error)
+	CreateRequest(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateLeaveRequest) (dto.LeaveRequestResponse, error)
 	ApproveRequest(ctx context.Context, approverID uint, requestID uint, req dto.ApproveLeaveRequest) (dto.LeaveRequestResponse, error)
 	RejectRequest(ctx context.Context, approverID uint, requestID uint, req dto.RejectLeaveRequest) (dto.LeaveRequestResponse, error)
 }
@@ -72,8 +72,19 @@ func (s *leaveService) GetRequestByID(ctx context.Context, id uint) (dto.LeaveRe
 	return *res, nil
 }
 
-func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req dto.CreateLeaveRequest) (dto.LeaveRequestResponse, error) {
-	overlap, err := s.repo.CheckOverlap(ctx, nil, employeeID, req.StartDate, req.EndDate, nil)
+func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateLeaveRequest) (dto.LeaveRequestResponse, error) {
+	targetEmployeeID := employeeID
+	isAdminSubmission := false
+
+	if req.EmployeeID != nil && *req.EmployeeID != employeeID {
+		if roleLevel != "superadmin" && roleLevel != "admin" {
+			return dto.LeaveRequestResponse{}, fmt.Errorf("unauthorized: only admin/superadmin can submit for other employees")
+		}
+		targetEmployeeID = *req.EmployeeID
+		isAdminSubmission = true
+	}
+
+	overlap, err := s.repo.CheckOverlap(ctx, nil, targetEmployeeID, req.StartDate, req.EndDate, nil)
 	if err != nil {
 		return dto.LeaveRequestResponse{}, fmt.Errorf("check overlap: %w", err)
 	}
@@ -94,15 +105,13 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req d
 
 	// Ensure balance exists
 	currYear := time.Now().Year()
-	bal, err := s.repo.GetBalanceByEmployeeAndType(ctx, tx, employeeID, req.LeaveTypeID, currYear)
+	bal, err := s.repo.GetBalanceByEmployeeAndType(ctx, tx, targetEmployeeID, req.LeaveTypeID, currYear)
 	if err != nil {
 		return dto.LeaveRequestResponse{}, fmt.Errorf("check balance: %w", err)
 	}
 	if bal == nil {
-		// Auto create unlimited balance if not exists for the sake of simplicity,
-		// or error out depending on system constraints. Here we assume we create a default unlimited context.
 		newBal := model.LeaveBalance{
-			EmployeeID:  employeeID,
+			EmployeeID:  targetEmployeeID,
 			LeaveTypeID: req.LeaveTypeID,
 			Year:        currYear,
 		}
@@ -121,8 +130,23 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req d
 	sDate, _ := time.Parse("2006-01-02", req.StartDate)
 	eDate, _ := time.Parse("2006-01-02", req.EndDate)
 
+	status := "pending"
+	apprLevel1Status := "pending"
+	apprLevel2Status := "pending"
+	var decidedAt *time.Time
+	var apprBy *uint
+	now := time.Now()
+
+	if isAdminSubmission {
+		status = "approved_hr"
+		apprLevel1Status = "approved"
+		apprLevel2Status = "approved"
+		decidedAt = &now
+		apprBy = &employeeID
+	}
+
 	m := model.LeaveRequest{
-		EmployeeID:  employeeID,
+		EmployeeID:  targetEmployeeID,
 		LeaveTypeID: req.LeaveTypeID,
 		StartDate:   sDate,
 		EndDate:     eDate,
@@ -130,7 +154,7 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req d
 		TotalHours:  &totalHours,
 		Reason:      req.Reason,
 		DocumentURL: req.DocumentURL,
-		Status:      "pending",
+		Status:      model.LeaveRequestStatusEnum(status),
 	}
 
 	created, err := s.repo.CreateRequest(ctx, tx, m)
@@ -142,7 +166,9 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req d
 	_, err = s.repo.CreateApproval(ctx, tx, model.LeaveRequestApproval{
 		LeaveRequestID: created.ID,
 		Level:          1,
-		Status:         "pending",
+		Status:         model.ApprovalStatusEnum(apprLevel1Status),
+		ApproverID:     apprBy,
+		DecidedAt:      decidedAt,
 	})
 	if err != nil {
 		return dto.LeaveRequestResponse{}, fmt.Errorf("create approval: %w", err)
@@ -150,10 +176,46 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, req d
 	_, err = s.repo.CreateApproval(ctx, tx, model.LeaveRequestApproval{
 		LeaveRequestID: created.ID,
 		Level:          2,
-		Status:         "pending",
+		Status:         model.ApprovalStatusEnum(apprLevel2Status),
+		ApproverID:     apprBy,
+		DecidedAt:      decidedAt,
 	})
 	if err != nil {
 		return dto.LeaveRequestResponse{}, fmt.Errorf("create approval: %w", err)
+	}
+
+	if isAdminSubmission {
+		balRefresher, _ := s.repo.GetBalanceByEmployeeAndType(ctx, tx, targetEmployeeID, req.LeaveTypeID, currYear)
+		if balRefresher != nil {
+			err = s.repo.UpdateBalanceUsage(ctx, tx, balRefresher.ID, balRefresher.UsedOccurrences+1, balRefresher.UsedDuration+req.TotalDays)
+			if err != nil {
+				return dto.LeaveRequestResponse{}, fmt.Errorf("update balance: %w", err)
+			}
+		}
+
+		for d := sDate; !d.After(eDate); d = d.AddDate(0, 0, 1) {
+			dateStr := d.Format("2006-01-02")
+			existingLog, _ := s.attendRepo.GetTodayLog(ctx, tx, targetEmployeeID, dateStr)
+			if existingLog != nil {
+				upd := map[string]interface{}{
+					"status":           string(model.AttendanceLeave),
+					"leave_request_id": created.ID,
+				}
+				s.attendRepo.UpdateLog(ctx, tx, existingLog.ID, upd)
+			} else {
+				cm := model.ClockMethodManual
+				newLog := model.AttendanceLog{
+					EmployeeID:          targetEmployeeID,
+					AttendanceDate:      d,
+					Status:              model.AttendanceLeave,
+					LeaveRequestID:      &created.ID,
+					ClockInMethod:       &cm,
+					ClockOutMethod:      &cm,
+					IsAutoGenerated:     true,
+				}
+				s.attendRepo.CreateLog(ctx, tx, newLog)
+			}
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

@@ -94,7 +94,7 @@ func (h *LeaveHandler) Create(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.CreateRequest(c.Context(), account.EmployeeID, req)
+	res, err := h.service.CreateRequest(c.Context(), account.EmployeeID, account.RoleLevel, req)
 	if err != nil {
 		return respondError(c, err)
 	}

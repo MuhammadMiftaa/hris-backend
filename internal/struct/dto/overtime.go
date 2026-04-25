@@ -16,16 +16,27 @@ type OvertimeRequestResponse struct {
 	ActualMinutes    *int       `json:"actual_minutes"`
 	Reason           string     `json:"reason"`
 	WorkLocationType string     `json:"work_location_type"`
-	Status           string     `json:"status"`
-	ApprovedBy       *uint      `json:"approved_by"`
-	ApproverName     *string    `json:"approver_name"`
-	ApproverNotes    *string    `json:"approver_notes"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        *time.Time `json:"updated_at"`
-	DeletedAt        *time.Time `json:"deleted_at"`
+	Status           string                     `json:"status"`
+	Approvals        []OvertimeApprovalResponse `json:"approvals,omitempty" gorm:"-"`
+	CreatedAt        time.Time                  `json:"created_at"`
+	UpdatedAt        *time.Time                 `json:"updated_at"`
+	DeletedAt        *time.Time                 `json:"deleted_at"`
+}
+
+type OvertimeApprovalResponse struct {
+	ID                uint       `json:"id"`
+	OvertimeRequestID uint       `json:"overtime_request_id"`
+	ApproverID        *uint      `json:"approver_id"`
+	ApproverName      *string    `json:"approver_name"`
+	Level             int        `json:"level"`
+	Status            string     `json:"status"`
+	Notes             *string    `json:"notes"`
+	DecidedAt         *time.Time `json:"decided_at"`
+	CreatedAt         time.Time  `json:"created_at"`
 }
 
 type CreateOvertimeRequest struct {
+	EmployeeID       *uint   `json:"employee_id"`
 	AttendanceLogID  *uint   `json:"attendance_log_id"`
 	OvertimeDate     string  `json:"overtime_date"`
 	PlannedStart     *string `json:"planned_start"`
@@ -35,9 +46,12 @@ type CreateOvertimeRequest struct {
 	WorkLocationType string  `json:"work_location_type"`
 }
 
-type UpdateOvertimeStatusRequest struct {
-	Status string  `json:"status"`
-	Notes  *string `json:"approver_notes"`
+type ApproveOvertimeRequest struct {
+	Notes *string `json:"notes"`
+}
+
+type RejectOvertimeRequest struct {
+	Notes string `json:"notes"`
 }
 
 type OvertimeListParams struct {

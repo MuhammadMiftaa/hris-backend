@@ -22,6 +22,7 @@ type BusinessTripRequestResponse struct {
 }
 
 type CreateBusinessTripRequest struct {
+	EmployeeID  *uint   `json:"employee_id"`
 	StartDate   string  `json:"start_date"`
 	EndDate     string  `json:"end_date"`
 	TotalDays   int     `json:"total_days"`

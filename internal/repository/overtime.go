@@ -15,7 +15,11 @@ type OvertimeRepository interface {
 	GetAll(ctx context.Context, tx Transaction, params dto.OvertimeListParams) ([]dto.OvertimeRequestResponse, error)
 	GetByID(ctx context.Context, tx Transaction, id uint) (*dto.OvertimeRequestResponse, error)
 	Create(ctx context.Context, tx Transaction, m model.OvertimeRequest) (model.OvertimeRequest, error)
-	UpdateStatus(ctx context.Context, tx Transaction, id uint, status string, approverID uint, notes *string) error
+	UpdateRequestStatus(ctx context.Context, tx Transaction, id uint, status string) error
+	CreateApproval(ctx context.Context, tx Transaction, m model.OvertimeRequestApproval) (model.OvertimeRequestApproval, error)
+	GetApprovalsByRequestID(ctx context.Context, tx Transaction, requestID uint) ([]dto.OvertimeApprovalResponse, error)
+	UpdateApprovalStatus(ctx context.Context, tx Transaction, approvalID uint, status string, approverID uint, notes *string) error
+	GetPendingApprovalForLevel(ctx context.Context, tx Transaction, requestID uint, level int) (*dto.OvertimeApprovalResponse, error)
 	Delete(ctx context.Context, tx Transaction, id uint) error
 }
 
@@ -53,14 +57,10 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 			o.planned_minutes,
 			o.reason,
 			o.status,
-			o.approved_by AS approver_id,
-			a.full_name AS approver_name,
-			o.approver_notes,
 			o.created_at,
 			o.updated_at
 		FROM overtime_requests o
 		JOIN employees e ON e.id = o.employee_id
-		LEFT JOIN employees a ON a.id = o.approved_by
 		WHERE o.deleted_at IS NULL
 	`
 	args := []interface{}{}
@@ -106,14 +106,10 @@ func (r *overtimeRepository) GetByID(ctx context.Context, tx Transaction, id uin
 			o.planned_minutes,
 			o.reason,
 			o.status,
-			o.approved_by AS approver_id,
-			a.full_name AS approver_name,
-			o.approver_notes,
 			o.created_at,
 			o.updated_at
 		FROM overtime_requests o
 		JOIN employees e ON e.id = o.employee_id
-		LEFT JOIN employees a ON a.id = o.approved_by
 		WHERE o.id = ? AND o.deleted_at IS NULL
 	`
 	if err := db.Raw(query, id).Scan(&res).Error; err != nil {
@@ -122,6 +118,12 @@ func (r *overtimeRepository) GetByID(ctx context.Context, tx Transaction, id uin
 	if res.ID == 0 {
 		return nil, fmt.Errorf("overtime request not found")
 	}
+
+	apprs, err := r.GetApprovalsByRequestID(ctx, tx, id)
+	if err == nil {
+		res.Approvals = apprs
+	}
+
 	return &res, nil
 }
 
@@ -136,17 +138,86 @@ func (r *overtimeRepository) Create(ctx context.Context, tx Transaction, m model
 	return m, nil
 }
 
-func (r *overtimeRepository) UpdateStatus(ctx context.Context, tx Transaction, id uint, status string, approverID uint, notes *string) error {
+func (r *overtimeRepository) UpdateRequestStatus(ctx context.Context, tx Transaction, id uint, status string) error {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return err
+	}
+	return db.Model(&model.OvertimeRequest{}).Where("id = ?", id).Update("status", status).Error
+}
+
+func (r *overtimeRepository) CreateApproval(ctx context.Context, tx Transaction, m model.OvertimeRequestApproval) (model.OvertimeRequestApproval, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return m, err
+	}
+	if err := db.Create(&m).Error; err != nil {
+		return m, err
+	}
+	return m, nil
+}
+
+func (r *overtimeRepository) GetApprovalsByRequestID(ctx context.Context, tx Transaction, requestID uint) ([]dto.OvertimeApprovalResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	query := `
+		SELECT
+			a.id,
+			a.overtime_request_id,
+			a.approver_id,
+			e.full_name AS approver_name,
+			a.level,
+			a.status,
+			a.notes,
+			a.decided_at,
+			a.created_at
+		FROM overtime_request_approvals a
+		LEFT JOIN employees e ON e.id = a.approver_id
+		WHERE a.overtime_request_id = ?
+		ORDER BY a.level ASC
+	`
+	var res []dto.OvertimeApprovalResponse
+	if err := db.Raw(query, requestID).Scan(&res).Error; err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (r *overtimeRepository) UpdateApprovalStatus(ctx context.Context, tx Transaction, approvalID uint, status string, approverID uint, notes *string) error {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
 		return err
 	}
 	upd := map[string]interface{}{
-		"status":         status,
-		"approver_id":    approverID,
-		"approver_notes": notes,
+		"status":      status,
+		"approver_id": approverID,
+		"notes":       notes,
+		"decided_at":  gorm.Expr("NOW()"),
 	}
-	return db.Model(&model.OvertimeRequest{}).Where("id = ?", id).Updates(upd).Error
+	return db.Model(&model.OvertimeRequestApproval{}).Where("id = ?", approvalID).Updates(upd).Error
+}
+
+func (r *overtimeRepository) GetPendingApprovalForLevel(ctx context.Context, tx Transaction, requestID uint, level int) (*dto.OvertimeApprovalResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	query := `
+		SELECT id, overtime_request_id, approver_id, level, status, notes, decided_at, created_at
+		FROM overtime_request_approvals
+		WHERE overtime_request_id = ? AND level = ? AND status = 'pending'
+		LIMIT 1
+	`
+	var res dto.OvertimeApprovalResponse
+	if err := db.Raw(query, requestID, level).Scan(&res).Error; err != nil {
+		return nil, err
+	}
+	if res.ID == 0 {
+		return nil, nil // not found
+	}
+	return &res, nil
 }
 
 func (r *overtimeRepository) Delete(ctx context.Context, tx Transaction, id uint) error {

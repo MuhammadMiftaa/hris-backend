@@ -64,6 +64,8 @@ type AttendanceRepository interface {
 	// Metadata
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetBranchMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+
+	GetEmployeeRoleLevel(ctx context.Context, tx Transaction, employeeID uint) (string, error)
 }
 
 type attendanceRepository struct {
@@ -451,7 +453,7 @@ func (r *attendanceRepository) GetApprovedOvertime(ctx context.Context, tx Trans
 		SELECT COUNT(*) FROM overtime_requests
 		WHERE employee_id = ?
 		  AND overtime_date = ?::DATE
-		  AND status = 'approved'
+		  AND status = 'approved_hr'
 		  AND deleted_at IS NULL
 	`, employeeID, date).Scan(&count).Error
 	return count > 0, err
@@ -533,7 +535,7 @@ func (r *attendanceRepository) LinkOvertimeToLog(ctx context.Context, tx Transac
 		SET attendance_log_id = ?, updated_at = NOW()
 		WHERE employee_id = ?
 		  AND overtime_date = ?::DATE
-		  AND status = 'approved'
+		  AND status = 'approved_hr'
 		  AND (attendance_log_id IS NULL OR attendance_log_id = ?)
 		  AND deleted_at IS NULL
 	`, logID, employeeID, date, logID).Error
@@ -679,4 +681,20 @@ func (r *attendanceRepository) GetBranchMetaList(ctx context.Context, tx Transac
 		ORDER BY name ASC
 	`).Scan(&meta).Error
 	return meta, err
+}
+
+func (r *attendanceRepository) GetEmployeeRoleLevel(ctx context.Context, tx Transaction, employeeID uint) (string, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return "", err
+	}
+	var level string
+	err = db.Raw(`
+		SELECT r.level::TEXT
+		FROM employees e
+		JOIN accounts a ON a.employee_id = e.id AND a.deleted_at IS NULL
+		JOIN roles r ON r.id = a.role_id AND r.deleted_at IS NULL
+		WHERE e.id = ? AND e.deleted_at IS NULL
+	`, employeeID).Scan(&level).Error
+	return level, err
 }

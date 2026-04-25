@@ -64,7 +64,11 @@ const (
 	PERM_BusinessTripApprove         = "business_trip-approve"
 	PERM_OvertimeRead                = "overtime-read"
 	PERM_OvertimeCreate              = "overtime-create"
+	PERM_OvertimeUpdate              = "overtime-update"
 	PERM_OvertimeApprove             = "overtime-approve"
+	// TODO: implement granular leader/HR approval permission — currently routes use PERM_OvertimeUpdate
+	PERM_OvertimeLeaderApprove       = "overtime-leader_approve"
+	PERM_OvertimeHRApprove           = "overtime-hr_approve"
 	PERM_DailyReportRead             = "daily_report-read"
 	PERM_DailyReportCreate           = "daily_report-create"
 	PERM_DailyReportDelete           = "daily_report-delete"

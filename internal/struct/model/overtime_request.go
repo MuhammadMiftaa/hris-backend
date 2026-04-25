@@ -27,9 +27,7 @@ type OvertimeRequest struct {
 	ActualMinutes    *int                  `                                                         json:"actual_minutes"`
 	Reason           string                `gorm:"type:text;not null"                                json:"reason"`
 	WorkLocationType *WorkLocationTypeEnum `gorm:"type:work_location_type_enum"                      json:"work_location_type"`
-	Status           RequestStatusEnum     `gorm:"type:request_status_enum;not null;default:pending" json:"status"`
-	ApprovedBy       *uint                 `gorm:"index"                                             json:"approved_by"`
-	ApproverNotes    *string               `gorm:"type:text"                                         json:"approver_notes"`
+	Status           LeaveRequestStatusEnum `gorm:"type:leave_request_status_enum;not null;default:pending" json:"status"`
 	CreatedAt        time.Time             `gorm:"not null;default:now()"                           json:"created_at"`
 	UpdatedAt        *time.Time            `                                                         json:"updated_at"`
 	DeletedAt        gorm.DeletedAt        `gorm:"index"                                             json:"deleted_at"`
@@ -37,5 +35,4 @@ type OvertimeRequest struct {
 	// Relations
 	Employee      Employee       `gorm:"foreignKey:EmployeeID"      json:"employee,omitempty"`
 	AttendanceLog *AttendanceLog `gorm:"foreignKey:AttendanceLogID" json:"attendance_log,omitempty"`
-	Approver      *Employee      `gorm:"foreignKey:ApprovedBy"      json:"approver,omitempty"`
 }

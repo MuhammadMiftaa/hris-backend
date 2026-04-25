@@ -61,7 +61,7 @@ func (h *OvertimeHandler) Create(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.Create(c.Context(), account.EmployeeID, req)
+	res, err := h.service.Create(c.Context(), account.EmployeeID, account.RoleLevel, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -74,20 +74,20 @@ func (h *OvertimeHandler) Create(c *fiber.Ctx) error {
 	})
 }
 
-// UpdateStatus — PUT /overtime-requests/:id
-func (h *OvertimeHandler) UpdateStatus(c *fiber.Ctx) error {
+// Approve — PUT /overtime-requests/:id/approve
+func (h *OvertimeHandler) Approve(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil {
 		return respondBadRequest(c, "invalid overtime ID")
 	}
 
-	var req dto.UpdateOvertimeStatusRequest
+	var req dto.ApproveOvertimeRequest
 	if err := c.BodyParser(&req); err != nil {
 		return respondBadRequest(c, "invalid request body")
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.UpdateStatus(c.Context(), account.EmployeeID, uint(id), req)
+	res, err := h.service.ApproveRequest(c.Context(), account.EmployeeID, uint(id), req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -95,7 +95,33 @@ func (h *OvertimeHandler) UpdateStatus(c *fiber.Ctx) error {
 	return c.JSON(dto.APIResponse{
 		Status:     true,
 		StatusCode: 200,
-		Message:    "overtime request status updated",
+		Message:    "overtime request approved",
+		Data:       res,
+	})
+}
+
+// Reject — PUT /overtime-requests/:id/reject
+func (h *OvertimeHandler) Reject(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return respondBadRequest(c, "invalid overtime ID")
+	}
+
+	var req dto.RejectOvertimeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return respondBadRequest(c, "invalid request body")
+	}
+
+	account := getAccountFromCtx(c)
+	res, err := h.service.RejectRequest(c.Context(), account.EmployeeID, uint(id), req)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "overtime request rejected",
 		Data:       res,
 	})
 }

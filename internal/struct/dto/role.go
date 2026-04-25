@@ -5,6 +5,7 @@ import "time"
 type RoleResponse struct {
 	ID              uint       `json:"id"`
 	Name            string     `json:"name"`
+	Level           string     `json:"level"`
 	Description     *string    `json:"description"`
 	PermissionCount *int       `json:"permission_count"`
 	CreatedAt       time.Time  `json:"created_at"`
@@ -27,11 +28,13 @@ type PermissionResponse struct {
 
 type CreateRoleRequest struct {
 	Name        string  `json:"name"`
+	Level       string  `json:"level"`
 	Description *string `json:"description"`
 }
 
 type UpdateRoleRequest struct {
 	Name        *string `json:"name"`
+	Level       *string `json:"level"`
 	Description *string `json:"description"`
 }
 
@@ -42,4 +45,5 @@ type UpdateRolePermissionsRequest struct {
 type RoleMetadata struct {
 	ModuleMeta []Meta `json:"module_meta"`
 	ActionMeta []Meta `json:"action_meta"`
+	LevelMeta  []Meta `json:"level_meta"`
 }

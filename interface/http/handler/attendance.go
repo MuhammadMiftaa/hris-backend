@@ -191,6 +191,12 @@ func (h *AttendanceHandler) ListOverrides(c *fiber.Ctx) error {
 		return respondBadRequest(c, err.Error())
 	}
 
+	// Level-based filter: Manager/Staff hanya bisa lihat override milik sendiri
+	account := getAccountFromCtx(c)
+	if account.RoleLevel == "manager" || account.RoleLevel == "staff" {
+		params.EmployeeID = &account.EmployeeID
+	}
+
 	res, err := h.service.GetAllOverrides(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
@@ -230,7 +236,7 @@ func (h *AttendanceHandler) CreateOverride(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.CreateOverride(c.Context(), account.EmployeeID, req)
+	res, err := h.service.CreateOverride(c.Context(), account.EmployeeID, account.RoleLevel, req)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -255,7 +261,7 @@ func (h *AttendanceHandler) UpdateOverride(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	res, err := h.service.UpdateOverrideStatus(c.Context(), account.EmployeeID, uint(id), req)
+	res, err := h.service.UpdateOverrideStatus(c.Context(), account.EmployeeID, account.RoleLevel, uint(id), req)
 	if err != nil {
 		return respondError(c, err)
 	}

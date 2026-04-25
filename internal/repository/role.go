@@ -45,7 +45,7 @@ func (r *roleRepository) GetAllRoles(ctx context.Context) ([]dto.RoleResponse, e
 	var roles []dto.RoleResponse
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			r.id, r.name, r.description,
+			r.id, r.name, r.level, r.description,
 			COUNT(rp.id) AS permission_count,
 			r.created_at, r.updated_at
 		FROM roles r
@@ -63,7 +63,7 @@ func (r *roleRepository) GetRoleByID(ctx context.Context, id string) (dto.RoleDe
 	var role dto.RoleResponse
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			r.id, r.name, r.description,
+			r.id, r.name, r.level, r.description,
 			COUNT(rp.id) AS permission_count,
 			r.created_at, r.updated_at
 		FROM roles r

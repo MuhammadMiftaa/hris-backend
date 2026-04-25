@@ -34,6 +34,7 @@ func (s *roleService) GetMetadata(ctx context.Context) dto.RoleMetadata {
 	return dto.RoleMetadata{
 		ModuleMeta: data.PermissionModuleMeta,
 		ActionMeta: data.PermissionActionMeta,
+		LevelMeta:  data.RoleLevelMeta,
 	}
 }
 
@@ -56,6 +57,7 @@ func (s *roleService) GetRoleByID(ctx context.Context, id string) (dto.RoleDetai
 func (s *roleService) CreateRole(ctx context.Context, req dto.CreateRoleRequest) (dto.RoleResponse, error) {
 	role := model.Role{
 		Name:        req.Name,
+		Level:       model.RoleLevelEnum(req.Level),
 		Description: req.Description,
 	}
 
@@ -67,6 +69,7 @@ func (s *roleService) CreateRole(ctx context.Context, req dto.CreateRoleRequest)
 	return dto.RoleResponse{
 		ID:          created.ID,
 		Name:        created.Name,
+		Level:       string(created.Level),
 		Description: created.Description,
 		CreatedAt:   created.CreatedAt,
 		UpdatedAt:   created.UpdatedAt,
@@ -77,6 +80,9 @@ func (s *roleService) UpdateRole(ctx context.Context, id string, req dto.UpdateR
 	role := model.Role{}
 	if req.Name != nil {
 		role.Name = *req.Name
+	}
+	if req.Level != nil {
+		role.Level = model.RoleLevelEnum(*req.Level)
 	}
 	if req.Description != nil {
 		role.Description = req.Description
