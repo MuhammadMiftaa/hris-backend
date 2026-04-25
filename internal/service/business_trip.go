@@ -59,6 +59,7 @@ func (s *businessTripService) Create(ctx context.Context, employeeID uint, req d
 		EmployeeID:  employeeID,
 		StartDate:   sDate,
 		EndDate:     eDate,
+		TotalDays:   req.TotalDays,
 		Destination: req.Destination,
 		Purpose:     req.Purpose,
 		DocumentURL: req.DocumentURL,
