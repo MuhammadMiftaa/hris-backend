@@ -150,6 +150,24 @@ func (s *attendanceService) GetTodayStatus(ctx context.Context, employeeID uint)
 	return resp, nil
 }
 
+// isGPSCheckRequired returns true when radius validation must be enforced.
+// GPS check is SKIPPED when:
+//   - employee has an approved business trip (working offsite by design)
+//   - the active shift has CanWFA = true (Work From Anywhere shift)
+//   - the branch has AllowWFH = true (branch-level WFH policy)
+func (s *attendanceService) isGPSCheckRequired(isBusinessTrip bool, shift *dto.ShiftDayContext, branch *model.Branch) bool {
+	if isBusinessTrip {
+		return false
+	}
+	if shift != nil && shift.CanWFA {
+		return false
+	}
+	if branch != nil && branch.AllowWFH {
+		return false
+	}
+	return true
+}
+
 func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dto.ClockInRequest) (dto.AttendanceLogResponse, error) {
 	today := utils.TodayDate()
 	now := utils.NowWIB()
@@ -197,33 +215,41 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("hari ini bukan hari kerja sesuai jadwal shift")
 	}
 
-	// 5. Cek GPS (kecuali ada dinas luar)
+	// 5. Cek dinas luar (business trip)
 	tripID, err := s.repo.GetApprovedBusinessTrip(ctx, nil, employeeID, today)
 	if err != nil {
 		return dto.AttendanceLogResponse{}, fmt.Errorf("check business trip: %w", err)
 	}
 	isBusinessTrip := tripID != nil
 
+	// 6. Validasi GPS radius
+	// GPS check di-skip jika: dinas luar, shift CanWFA=true, atau branch AllowWFH=true
 	clockMethod := model.ClockMethodGPS
-	if !isBusinessTrip {
-		if branchID == nil {
-			return dto.AttendanceLogResponse{}, fmt.Errorf("pegawai tidak memiliki cabang yang terdaftar")
-		}
-		branch, err := s.repo.GetBranchByID(ctx, nil, *branchID)
+
+	var branch *model.Branch
+	if branchID != nil {
+		branch, err = s.repo.GetBranchByID(ctx, nil, *branchID)
 		if err != nil {
 			return dto.AttendanceLogResponse{}, fmt.Errorf("get branch detail: %w", err)
 		}
-		if !branch.AllowWFH {
-			if branch.Latitude == nil || branch.Longitude == nil {
-				return dto.AttendanceLogResponse{}, fmt.Errorf("koordinat cabang belum dikonfigurasi")
-			}
-			dist := utils.HaversineDistance(req.Latitude, req.Longitude, *branch.Latitude, *branch.Longitude)
-			if dist > float64(branch.RadiusMeters) {
-				return dto.AttendanceLogResponse{}, fmt.Errorf(
-					"bad request: lokasi anda (%.0f meter) di luar radius presensi yang diizinkan (%d meter)",
-					dist, branch.RadiusMeters,
-				)
-			}
+	}
+
+	if s.isGPSCheckRequired(isBusinessTrip, shift, branch) {
+		if branchID == nil {
+			return dto.AttendanceLogResponse{}, fmt.Errorf("pegawai tidak memiliki cabang yang terdaftar")
+		}
+		if branch == nil {
+			return dto.AttendanceLogResponse{}, fmt.Errorf("data cabang tidak ditemukan")
+		}
+		if branch.Latitude == nil || branch.Longitude == nil {
+			return dto.AttendanceLogResponse{}, fmt.Errorf("koordinat cabang belum dikonfigurasi")
+		}
+		dist := utils.HaversineDistance(req.Latitude, req.Longitude, *branch.Latitude, *branch.Longitude)
+		if dist > float64(branch.RadiusMeters) {
+			return dto.AttendanceLogResponse{}, fmt.Errorf(
+				"bad request: lokasi anda (%.0f meter) di luar radius presensi yang diizinkan (%d meter)",
+				dist, branch.RadiusMeters,
+			)
 		}
 	}
 
@@ -327,7 +353,7 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 		return dto.AttendanceLogResponse{}, fmt.Errorf("get schedule: %w", err)
 	}
 
-	// 2. GPS check (kecuali business trip)
+	// 2. GPS check (kecuali business trip, CanWFA, atau AllowWFH)
 	isBusinessTrip := existing.BusinessTripRequestID != nil
 
 	branchID, err := s.repo.GetEmployeeBranchID(ctx, nil, employeeID)
@@ -336,12 +362,17 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 	}
 
 	clockMethod := model.ClockMethodGPS
-	if !isBusinessTrip && branchID != nil {
-		branch, err := s.repo.GetBranchByID(ctx, nil, *branchID)
+
+	var branch *model.Branch
+	if branchID != nil {
+		branch, err = s.repo.GetBranchByID(ctx, nil, *branchID)
 		if err != nil {
 			return dto.AttendanceLogResponse{}, fmt.Errorf("get branch detail: %w", err)
 		}
-		if !branch.AllowWFH && branch.Latitude != nil && branch.Longitude != nil {
+	}
+
+	if s.isGPSCheckRequired(isBusinessTrip, shift, branch) {
+		if branch != nil && branch.Latitude != nil && branch.Longitude != nil {
 			dist := utils.HaversineDistance(req.Latitude, req.Longitude, *branch.Latitude, *branch.Longitude)
 			if dist > float64(branch.RadiusMeters) {
 				return dto.AttendanceLogResponse{}, fmt.Errorf(
@@ -355,7 +386,6 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 	// 3. Hitung early leave dan overtime
 	earlyLeaveMinutes := 0
 	overtimeMinutes := 0
-	// Konversi dari string (dto) ke model enum
 	newStatus := model.AttendanceStatusEnum(existing.Status)
 
 	// Cek izin pulang cepat
@@ -507,7 +537,6 @@ func (s *attendanceService) CreateManualAttendance(ctx context.Context, employee
 			log.Debug("parse clock out time: %w", map[string]any{"Result": tOut, "clock out": *req.ClockOutAt, "date": req.AttendanceDate})
 			return dto.AttendanceLogResponse{}, fmt.Errorf("parse clock out time: %w", err)
 		}
-
 		tOutPtr = &tOut
 	}
 
@@ -560,11 +589,11 @@ func (s *attendanceService) CreateManualAttendance(ctx context.Context, employee
 		return dto.AttendanceLogResponse{}, fmt.Errorf("commit: %w", err)
 	}
 
-	log, err := s.repo.GetLogByID(ctx, nil, created.ID)
-	if err != nil || log == nil {
+	result, err := s.repo.GetLogByID(ctx, nil, created.ID)
+	if err != nil || result == nil {
 		return dto.AttendanceLogResponse{}, fmt.Errorf("fetch created log: %w", err)
 	}
-	return *log, nil
+	return *result, nil
 }
 
 func (s *attendanceService) GetAllOverrides(ctx context.Context, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error) {
@@ -580,20 +609,20 @@ func (s *attendanceService) GetOverrideByID(ctx context.Context, id uint) (dto.A
 }
 
 func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint, req dto.CreateOverrideRequest) (dto.AttendanceOverrideResponse, error) {
-	log, err := s.repo.GetLogByID(ctx, nil, req.AttendanceLogID)
-	if err != nil || log == nil {
+	attendanceLog, err := s.repo.GetLogByID(ctx, nil, req.AttendanceLogID)
+	if err != nil || attendanceLog == nil {
 		return dto.AttendanceOverrideResponse{}, fmt.Errorf("attendance log not found: %w", err)
 	}
 
 	var parsedIn, parsedOut *time.Time
 	if req.CorrectedClockIn != nil {
-		t, e := utils.ParseTimeString(*req.CorrectedClockIn, log.AttendanceDate)
+		t, e := utils.ParseTimeString(*req.CorrectedClockIn, attendanceLog.AttendanceDate)
 		if e == nil {
 			parsedIn = &t
 		}
 	}
 	if req.CorrectedClockOut != nil {
-		t, e := utils.ParseTimeString(*req.CorrectedClockOut, log.AttendanceDate)
+		t, e := utils.ParseTimeString(*req.CorrectedClockOut, attendanceLog.AttendanceDate)
 		if e == nil {
 			parsedOut = &t
 		}
@@ -611,8 +640,8 @@ func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint,
 		AttendanceLogID:   req.AttendanceLogID,
 		RequestedBy:       employeeID,
 		OverrideType:      modelType,
-		OriginalClockIn:   log.ClockInAt,
-		OriginalClockOut:  log.ClockOutAt,
+		OriginalClockIn:   attendanceLog.ClockInAt,
+		OriginalClockOut:  attendanceLog.ClockOutAt,
 		CorrectedClockIn:  parsedIn,
 		CorrectedClockOut: parsedOut,
 		Reason:            req.Reason,
@@ -692,13 +721,7 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 			fixTZ := effectiveClockOut.Add(-7 * time.Hour)
 			effectiveClockOut = &fixTZ
 		}
-		log.Debug("Clock in & Clock out", map[string]any{
-			"effective_clock_in":  effectiveClockIn,
-			"effective_clock_out": effectiveClockOut,
-			"ov_corrected_in":     ov.CorrectedClockIn,
-			"ov_corrected_out":    ov.CorrectedClockOut,
-		})
-		// Terapkan corrected values ke log
+
 		if ov.CorrectedClockIn != nil {
 			logUpds["clock_in_at"] = ov.CorrectedClockIn
 		}
@@ -707,27 +730,17 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 		}
 		logUpds["updated_at"] = time.Now()
 
-		// Ambil shift untuk recalculate late/early minutes
 		shift, err := s.repo.GetActiveSchedule(ctx, nil, attendanceLog.EmployeeID, attendanceLog.AttendanceDate)
-		log.Debug("Shift found", map[string]any{
-			"shift":      shift,
-			"err":        err,
-			"isFlexible": shift != nil && shift.IsFlexible,
-		})
 		if err == nil && shift != nil && !shift.IsFlexible {
 			newStatus := model.AttendanceStatusEnum(attendanceLog.Status)
-
-			// Jangan ubah status business_trip
 			isBusinessTrip := newStatus == model.AttendanceBusinessTrip
 
-			// --- Recalculate late minutes dari clock_in ---
 			if effectiveClockIn != nil && shift.ClockInEnd != nil {
 				clockInEnd, parseErr := utils.ParseTimeString(*shift.ClockInEnd, attendanceLog.AttendanceDate)
 				if parseErr == nil {
 					if effectiveClockIn.After(clockInEnd) {
 						lateMinutes := int(effectiveClockIn.Sub(clockInEnd).Minutes())
 						logUpds["late_minutes"] = lateMinutes
-
 						if !isBusinessTrip {
 							latePerm, _ := s.repo.GetApprovedPermission(ctx, nil, attendanceLog.EmployeeID, attendanceLog.AttendanceDate, "late_arrival")
 							if latePerm != nil {
@@ -736,29 +749,15 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 								newStatus = model.AttendanceLate
 							}
 						}
-
-						log.Debug("Late minutes recalculation", map[string]any{
-							"clockInEnd":       clockInEnd,
-							"effectiveClockIn": effectiveClockIn,
-							"lateMinutes":      lateMinutes,
-							"newStatus":        newStatus,
-						})
 					} else {
-						// Clock in sudah tidak terlambat setelah koreksi
 						logUpds["late_minutes"] = 0
 						if !isBusinessTrip && newStatus == model.AttendanceLate {
 							newStatus = model.AttendancePresent
 						}
-						log.Debug("Late minutes reset", map[string]any{
-							"clockInEnd":       clockInEnd,
-							"effectiveClockIn": effectiveClockIn,
-							"newStatus":        newStatus,
-						})
 					}
 				}
 			}
 
-			// --- Recalculate early leave minutes & overtime dari clock_out ---
 			if effectiveClockOut != nil {
 				if shift.ClockOutStart != nil {
 					clockOutStart, parseErr := utils.ParseTimeString(*shift.ClockOutStart, attendanceLog.AttendanceDate)
@@ -766,31 +765,18 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 						if effectiveClockOut.Before(clockOutStart) {
 							earlyLeaveMinutes := int(clockOutStart.Sub(*effectiveClockOut).Minutes())
 							logUpds["early_leave_minutes"] = earlyLeaveMinutes
-
 							if !isBusinessTrip {
 								earlyPerm, _ := s.repo.GetApprovedPermission(ctx, nil, attendanceLog.EmployeeID, attendanceLog.AttendanceDate, "early_leave")
-								if earlyPerm != nil {
-									// Ada izin → tidak ubah ke half_day
-								} else {
+								if earlyPerm == nil {
 									newStatus = model.AttendanceHalfDay
 								}
+								
 							}
-							log.Debug("Early leave recalculation", map[string]any{
-								"clockOutStart":     clockOutStart,
-								"effectiveClockOut": effectiveClockOut,
-								"earlyLeaveMinutes": earlyLeaveMinutes,
-								"newStatus":         newStatus,
-							})
 						} else {
 							logUpds["early_leave_minutes"] = 0
 							if !isBusinessTrip && newStatus == model.AttendanceHalfDay {
 								newStatus = model.AttendancePresent
 							}
-							log.Debug("Early leave reset", map[string]any{
-								"clockOutStart":     clockOutStart,
-								"effectiveClockOut": effectiveClockOut,
-								"newStatus":         newStatus,
-							})
 						}
 					}
 				}
@@ -801,17 +787,8 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 						if effectiveClockOut.After(clockOutEnd) {
 							overtimeMinutes := int(effectiveClockOut.Sub(clockOutEnd).Minutes())
 							logUpds["overtime_minutes"] = overtimeMinutes
-							log.Debug("Overtime recalculation", map[string]any{
-								"clockOutEnd":       clockOutEnd,
-								"effectiveClockOut": effectiveClockOut,
-								"overtimeMinutes":   overtimeMinutes,
-							})
 						} else {
 							logUpds["overtime_minutes"] = 0
-							log.Debug("Overtime reset", map[string]any{
-								"clockOutEnd":       clockOutEnd,
-								"effectiveClockOut": effectiveClockOut,
-							})
 						}
 					}
 				}
@@ -820,15 +797,7 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 			if !isBusinessTrip {
 				logUpds["status"] = newStatus
 			}
-			log.Debug("Final New Status", map[string]any{
-				"newStatus":      newStatus,
-				"isBusinessTrip": isBusinessTrip,
-			})
 		}
-
-		log.Debug("Final Log Updates", map[string]any{
-			"logUpds": logUpds,
-		})
 
 		if err := s.repo.UpdateLog(ctx, tx, ov.AttendanceLogID, logUpds); err != nil {
 			return dto.AttendanceOverrideResponse{}, fmt.Errorf("syncing corrected values: %w", err)

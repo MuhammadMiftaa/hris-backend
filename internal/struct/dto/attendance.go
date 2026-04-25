@@ -79,6 +79,7 @@ type ShiftDayContext struct {
 	IsFlexible      bool    `json:"is_flexible"`
 	DayOfWeek       string  `json:"day_of_week"`
 	IsWorkingDay    bool    `json:"is_working_day"`
+	CanWFA          bool    `json:"can_wfa"`
 	ClockInStart    *string `json:"clock_in_start"`
 	ClockInEnd      *string `json:"clock_in_end"`
 	ClockOutStart   *string `json:"clock_out_start"`

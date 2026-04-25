@@ -79,6 +79,7 @@ func (s *shiftService) CreateTemplate(ctx context.Context, req dto.CreateShiftRe
 	tmpl, err := s.repo.CreateShiftTemplate(ctx, tx, model.ShiftTemplate{
 		Name:       req.Name,
 		IsFlexible: req.IsFlexible,
+		CanWFA:     req.CanWFA, // ← propagate CanWFA
 	})
 	if err != nil {
 		return dto.ShiftTemplateResponse{}, fmt.Errorf("create shift template: %w", err)
@@ -116,12 +117,16 @@ func (s *shiftService) UpdateTemplate(ctx context.Context, id uint, req dto.Upda
 	updateModel := model.ShiftTemplate{
 		Name:       existing.Name,
 		IsFlexible: existing.IsFlexible,
+		CanWFA:     existing.CanWFA, // ← keep existing value as default
 	}
 	if req.Name != nil {
 		updateModel.Name = *req.Name
 	}
 	if req.IsFlexible != nil {
 		updateModel.IsFlexible = *req.IsFlexible
+	}
+	if req.CanWFA != nil {
+		updateModel.CanWFA = *req.CanWFA // ← apply override when provided
 	}
 
 	if _, err := s.repo.UpdateShiftTemplate(ctx, tx, id, updateModel); err != nil {
@@ -338,12 +343,14 @@ func (s *shiftService) CheckTodaySchedule(ctx context.Context, employeeID uint) 
 			IsWorkingDay: false,
 			Reason:       "Bukan hari kerja sesuai jadwal shift",
 			ShiftName:    &shift.ShiftName,
+			CanWFA:       shift.CanWFA, // ← propagate CanWFA even on non-working days
 		}, nil
 	}
 
 	return dto.TodayScheduleResponse{
 		IsWorkingDay:  true,
 		ShiftName:     &shift.ShiftName,
+		CanWFA:        shift.CanWFA, // ← propagate CanWFA to frontend
 		ClockInStart:  shift.ClockInStart,
 		ClockInEnd:    shift.ClockInEnd,
 		ClockOutStart: shift.ClockOutStart,
