@@ -317,6 +317,7 @@ func (s *employeeService) validateEmployeePayload(req dto.EmployeeRequest) (mode
 		BloodType:      req.BloodType,
 		Nationality:    req.Nationality,
 		PhotoURL:       req.PhotoURL,
+		IsTrainer:      req.IsTrainer,
 		BranchID:       req.BranchID,
 		DepartmentID:   req.DepartmentID,
 		JobPositionsID: req.JobPositionsID,
