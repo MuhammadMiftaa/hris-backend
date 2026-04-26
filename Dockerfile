@@ -16,4 +16,4 @@ COPY --from=builder app/main .
 EXPOSE 8080
 EXPOSE 9090
 
-CMD ["./main"]
+CMD ["./main"] 
