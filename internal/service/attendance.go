@@ -700,12 +700,12 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 		return dto.AttendanceOverrideResponse{}, fmt.Errorf("override is no longer pending")
 	}
 
-	if roleLevel != "superadmin" && roleLevel != "admin" {
+	if roleLevel != string(model.RoleLevelSuperAdmin) && roleLevel != string(model.RoleLevelAdmin) {
 		reqLevelStr, e := s.repo.GetEmployeeRoleLevel(ctx, nil, ov.RequestedBy)
 		if e != nil {
 			return dto.AttendanceOverrideResponse{}, fmt.Errorf("failed to check requester rank: %w", e)
 		}
-		
+
 		if getRoleWeight(roleLevel) <= getRoleWeight(reqLevelStr) {
 			return dto.AttendanceOverrideResponse{}, fmt.Errorf("unauthorized: you can only approve requests from lower rank employee")
 		}
@@ -809,7 +809,7 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 								if earlyPerm == nil {
 									newStatus = model.AttendanceHalfDay
 								}
-								
+
 							}
 						} else {
 							logUpds["early_leave_minutes"] = 0

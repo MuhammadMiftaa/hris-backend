@@ -59,7 +59,7 @@ func (s *businessTripService) Create(ctx context.Context, employeeID uint, roleL
 	isAdminSubmission := false
 
 	if req.EmployeeID != nil && *req.EmployeeID != employeeID {
-		if roleLevel != "superadmin" && roleLevel != "admin" {
+		if roleLevel != string(model.RoleLevelSuperAdmin) && roleLevel != string(model.RoleLevelAdmin) {
 			return dto.BusinessTripRequestResponse{}, fmt.Errorf("unauthorized: only admin/superadmin can submit for other employees")
 		}
 		targetEmployeeID = *req.EmployeeID

@@ -8,6 +8,7 @@ import (
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 )
 
 type OvertimeService interface {
@@ -59,7 +60,7 @@ func (s *overtimeService) Create(ctx context.Context, employeeID uint, roleLevel
 	isAdminSubmission := false
 
 	if req.EmployeeID != nil && *req.EmployeeID != employeeID {
-		if roleLevel != "superadmin" && roleLevel != "admin" {
+		if roleLevel != string(model.RoleLevelSuperAdmin) && roleLevel != string(model.RoleLevelAdmin) {
 			return dto.OvertimeRequestResponse{}, fmt.Errorf("unauthorized: only admin/superadmin can submit for other employees")
 		}
 		targetEmployeeID = *req.EmployeeID
@@ -77,12 +78,30 @@ func (s *overtimeService) Create(ctx context.Context, employeeID uint, roleLevel
 		initialStatus = "approved_hr"
 	}
 
+	var plannedStart, plannedEnd time.Time
+	if req.PlannedStart != nil {
+		plannedStart, err = utils.ParseTimeString(*req.PlannedStart, "")
+		if err != nil {
+			return dto.OvertimeRequestResponse{}, fmt.Errorf("invalid planned start time format")
+		}
+	}
+	if req.PlannedEnd != nil {
+		plannedEnd, err = utils.ParseTimeString(*req.PlannedEnd, "")
+		if err != nil {
+			return dto.OvertimeRequestResponse{}, fmt.Errorf("invalid planned end time format")
+		}
+	}
+
 	m := model.OvertimeRequest{
-		EmployeeID:     targetEmployeeID,
-		OvertimeDate:   d,
-		PlannedMinutes: req.PlannedMinutes,
-		Reason:         req.Reason,
-		Status:         model.LeaveRequestStatusEnum(initialStatus),
+		EmployeeID:       targetEmployeeID,
+		OvertimeDate:     d,
+		PlannedMinutes:   req.PlannedMinutes,
+		PlannedStart:     &plannedStart,
+		PlannedEnd:       &plannedEnd,
+		WorkLocationType: (*model.WorkLocationTypeEnum)(&req.WorkLocationType),
+
+		Reason: req.Reason,
+		Status: model.LeaveRequestStatusEnum(initialStatus),
 	}
 
 	created, err := s.repo.Create(ctx, tx, m)
@@ -93,7 +112,7 @@ func (s *overtimeService) Create(ctx context.Context, employeeID uint, roleLevel
 	// Create approvals
 	apprLeaderStatus := "pending"
 	apprHRStatus := "pending"
-	
+
 	var decidedAt *time.Time
 	var apprBy *uint
 	now := time.Now()
@@ -115,7 +134,7 @@ func (s *overtimeService) Create(ctx context.Context, employeeID uint, roleLevel
 	if err != nil {
 		return dto.OvertimeRequestResponse{}, err
 	}
-	
+
 	_, err = s.repo.CreateApproval(ctx, tx, model.OvertimeRequestApproval{
 		OvertimeRequestID: created.ID,
 		Level:             2,

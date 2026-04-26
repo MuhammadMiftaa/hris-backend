@@ -73,7 +73,7 @@ func (s *permissionRequestService) Create(ctx context.Context, employeeID uint, 
 	isAdminSubmission := false
 
 	if req.EmployeeID != nil && *req.EmployeeID != employeeID {
-		if roleLevel != "superadmin" && roleLevel != "admin" {
+		if roleLevel != string(model.RoleLevelSuperAdmin) && roleLevel != string(model.RoleLevelAdmin) {
 			return dto.PermissionRequestResponse{}, fmt.Errorf("unauthorized: only admin/superadmin can submit for other employees")
 		}
 		targetEmployeeID = *req.EmployeeID
@@ -98,7 +98,7 @@ func (s *permissionRequestService) Create(ctx context.Context, employeeID uint, 
 		EmployeeID:     targetEmployeeID,
 		Date:           parsedDate,
 		PermissionType: model.PermissionTypeEnum(req.PermissionType),
-		LeaveTime:      req.LeaveTime, 
+		LeaveTime:      req.LeaveTime,
 		ReturnTime:     req.ReturnTime,
 		Reason:         req.Reason,
 		DocumentURL:    req.DocumentURL,
