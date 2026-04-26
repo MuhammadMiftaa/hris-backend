@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	BucketAttendance    = "attendance-photos"
-	BucketMutabaah      = "mutabaah-docs"
-	BucketProfilePhotos = "profile-photos"
+	BucketAttendance            = "attendance-photos"
+	BucketMutabaah              = "mutabaah-docs"
+	BucketProfilePhotos         = "profile-photos"
+	BucketLeaveDocuments        = "leave-documents"
+	BucketBusinessTripDocuments = "business-trip-documents"
 
 	// Presigned PUT URL untuk upload foto dari browser (kamera PWA) — 5 menit
 	PresignedUploadExpiry = 5 * time.Minute
@@ -55,7 +57,10 @@ func NewMinioClient(cfg env.Minio) (MinioClient, error) {
 
 // EnsureBuckets buat bucket saat startup jika belum ada, dan set policy private
 func (m *minioClient) EnsureBuckets(ctx context.Context) error {
-	buckets := []string{BucketAttendance, BucketMutabaah, BucketProfilePhotos}
+	buckets := []string{
+		BucketAttendance, BucketMutabaah, BucketProfilePhotos,
+		BucketLeaveDocuments, BucketBusinessTripDocuments,
+	}
 	for _, bucket := range buckets {
 		exists, err := m.client.BucketExists(ctx, bucket)
 		if err != nil {

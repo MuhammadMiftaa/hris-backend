@@ -152,6 +152,7 @@ func (s *dashboardService) GetHRDDashboard(ctx context.Context, hrID uint) (dto.
 }
 
 func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankingsResponse, error) {
+	today := utils.TodayDate()
 	now := time.Now()
 	year, month, _ := now.Date()
 
@@ -163,9 +164,9 @@ func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankin
 	if err != nil {
 		log.Printf("[WARN] GetTopTilawahByDepartment failed: %v", err)
 	}
-	mostLate, err := s.dashboardRepo.GetMostLateRanking(ctx, year, int(month), 5)
+	fastestMutabaah, err := s.dashboardRepo.GetFastestMutabaahRanking(ctx, today, 5)
 	if err != nil {
-		log.Printf("[WARN] GetMostLateRanking failed: %v", err)
+		log.Printf("[WARN] GetFastestMutabaahRanking failed: %v", err)
 	}
 
 	if fastest == nil {
@@ -174,14 +175,14 @@ func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankin
 	if tilawah == nil {
 		tilawah = []dto.DepartmentRankingDTO{}
 	}
-	if mostLate == nil {
-		mostLate = []dto.RankingEntryDTO{}
+	if fastestMutabaah == nil {
+		fastestMutabaah = []dto.RankingEntryDTO{}
 	}
 
 	return dto.DashboardRankingsResponse{
-		FastestArrival: fastest,
-		TopTilawah:     tilawah,
-		MostLate:       mostLate,
+		FastestArrival:  fastest,
+		TopTilawah:      tilawah,
+		FastestMutabaah: fastestMutabaah,
 	}, nil
 }
 

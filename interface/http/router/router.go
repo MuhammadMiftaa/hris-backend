@@ -64,13 +64,14 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, mi
 	route.HolidayRoutes(app, dbInstance.GetDB())
 	route.AttendanceRoutes(app, dbInstance.GetDB(), minioClient)
 	route.MutabaahRoutes(app, dbInstance.GetDB())
-	route.LeaveRoutes(app, dbInstance.GetDB())
+	route.LeaveRoutes(app, dbInstance.GetDB(), minioClient)
 	route.PermissionRequestRoutes(app, dbInstance.GetDB())
-	route.BusinessTripRoutes(app, dbInstance.GetDB())
+	route.BusinessTripRoutes(app, dbInstance.GetDB(), minioClient)
 	route.OvertimeRoutes(app, dbInstance.GetDB())
 	route.DailyReportRoutes(app, dbInstance.GetDB())
 	route.DashboardRoutes(app, dbInstance.GetDB())
 	route.ProfileRoutes(app, dbInstance.GetDB(), minioClient)
+	route.DocumentRoutes(app, minioClient)
 
 	return app
 }

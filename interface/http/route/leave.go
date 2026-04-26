@@ -1,6 +1,7 @@
 package route
 
 import (
+	"hris-backend/config/storage"
 	"hris-backend/interface/http/handler"
 	"hris-backend/interface/http/middleware"
 	"hris-backend/internal/repository"
@@ -11,11 +12,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func LeaveRoutes(app *fiber.App, db *gorm.DB) {
+func LeaveRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 	leaveRepo := repository.NewLeaveRepository(db)
 	attendRepo := repository.NewAttendanceRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewLeaveService(leaveRepo, attendRepo, txManager)
+	svc := service.NewLeaveService(leaveRepo, attendRepo, txManager, minio)
 	h := handler.NewLeaveHandler(svc)
 
 	app.Get("/leave-requests/metadata", h.Metadata)

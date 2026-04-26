@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"hris-backend/config/storage"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -25,17 +27,20 @@ type leaveService struct {
 	repo       repository.LeaveRepository
 	attendRepo repository.AttendanceRepository
 	txManager  repository.TxManager
+	minio      storage.MinioClient
 }
 
 func NewLeaveService(
 	repo repository.LeaveRepository,
 	attendRepo repository.AttendanceRepository,
 	txManager repository.TxManager,
+	minio storage.MinioClient,
 ) LeaveService {
 	return &leaveService{
 		repo:       repo,
 		attendRepo: attendRepo,
 		txManager:  txManager,
+		minio:      minio,
 	}
 }
 
@@ -61,13 +66,31 @@ func (s *leaveService) GetAllBalances(ctx context.Context, params dto.LeaveBalan
 }
 
 func (s *leaveService) GetAllRequests(ctx context.Context, params dto.LeaveRequestListParams) ([]dto.LeaveRequestResponse, error) {
-	return s.repo.GetAllRequests(ctx, nil, params)
+	reqs, err := s.repo.GetAllRequests(ctx, nil, params)
+	if err != nil {
+		return nil, err
+	}
+	for i := range reqs {
+		if reqs[i].DocumentURL != nil && *reqs[i].DocumentURL != "" && !strings.HasPrefix(*reqs[i].DocumentURL, "http") {
+			url, err := s.minio.PresignedGetObject(ctx, storage.BucketLeaveDocuments, *reqs[i].DocumentURL, storage.PresignedDownloadExpiry)
+			if err == nil {
+				reqs[i].DocumentURL = &url
+			}
+		}
+	}
+	return reqs, nil
 }
 
 func (s *leaveService) GetRequestByID(ctx context.Context, id uint) (dto.LeaveRequestResponse, error) {
 	res, err := s.repo.GetRequestByID(ctx, nil, id)
 	if err != nil {
 		return dto.LeaveRequestResponse{}, err
+	}
+	if res.DocumentURL != nil && *res.DocumentURL != "" && !strings.HasPrefix(*res.DocumentURL, "http") {
+		url, err := s.minio.PresignedGetObject(ctx, storage.BucketLeaveDocuments, *res.DocumentURL, storage.PresignedDownloadExpiry)
+		if err == nil {
+			res.DocumentURL = &url
+		}
 	}
 	return *res, nil
 }

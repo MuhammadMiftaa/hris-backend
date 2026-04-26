@@ -250,11 +250,23 @@ func (r *mutabaahRepository) GetDailyReport(ctx context.Context, tx Transaction,
 			ml.submitted_at::TEXT AS submitted_at
 		FROM employees e
 		LEFT JOIN departments d ON d.id = e.department_id
+		INNER JOIN employee_schedules es
+			ON es.employee_id = e.id
+			AND es.is_active = TRUE
+			AND es.effective_date <= ?::DATE
+			AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+			AND es.deleted_at IS NULL
+		INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		INNER JOIN shift_template_details std
+			ON std.shift_template_id = st.id
+			AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+			AND std.is_working_day = TRUE
+			AND std.deleted_at IS NULL
 		LEFT JOIN mutabaah_logs ml ON ml.employee_id = e.id AND ml.log_date = ?::DATE AND ml.deleted_at IS NULL
 		WHERE e.deleted_at IS NULL
 		ORDER BY e.full_name ASC
 	`
-	err = db.Raw(query, date).Scan(&results).Error
+	err = db.Raw(query, date, date, date, date).Scan(&results).Error
 	return results, err
 }
 
@@ -266,28 +278,53 @@ func (r *mutabaahRepository) GetMonthlyReport(ctx context.Context, tx Transactio
 
 	var results []dto.MutabaahMonthlySummary
 	query := `
+		WITH month_dates AS (
+			SELECT generate_series(
+				DATE_TRUNC('month', MAKE_DATE(?, ?, 1)),
+				(DATE_TRUNC('month', MAKE_DATE(?, ?, 1)) + INTERVAL '1 month - 1 day')::DATE,
+				'1 day'::INTERVAL
+			)::DATE AS dt
+		),
+		employee_working_days AS (
+			SELECT 
+				e.id AS employee_id,
+				COUNT(md.dt) AS total_working_days
+			FROM employees e
+			INNER JOIN employee_schedules es 
+				ON es.employee_id = e.id AND es.is_active = TRUE AND es.deleted_at IS NULL
+			INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+			INNER JOIN shift_template_details std 
+				ON std.shift_template_id = st.id AND std.is_working_day = TRUE AND std.deleted_at IS NULL
+			CROSS JOIN month_dates md
+			WHERE e.deleted_at IS NULL
+				AND es.effective_date <= md.dt
+				AND (es.end_date IS NULL OR es.end_date >= md.dt)
+				AND std.day_of_week = LOWER(TRIM(TO_CHAR(md.dt, 'Day')))::day_of_week_enum
+			GROUP BY e.id
+		)
 		SELECT
 			e.id AS employee_id,
 			e.full_name AS employee_name,
 			e.is_trainer,
-			COUNT(CASE WHEN al.status IN ('present', 'late', 'business_trip') THEN 1 END) AS total_working_days,
+			COALESCE(ewd.total_working_days, 0) AS total_working_days,
 			COUNT(CASE WHEN ml.is_submitted = true THEN 1 END) AS total_submitted,
 			CASE 
-				WHEN COUNT(CASE WHEN al.status IN ('present', 'late', 'business_trip') THEN 1 END) > 0 
-				THEN (COUNT(CASE WHEN ml.is_submitted = true THEN 1 END)::FLOAT / COUNT(CASE WHEN al.status IN ('present', 'late', 'business_trip') THEN 1 END)) * 100
+				WHEN COALESCE(ewd.total_working_days, 0) > 0 
+				THEN (COUNT(CASE WHEN ml.is_submitted = true THEN 1 END)::FLOAT / ewd.total_working_days) * 100
 				ELSE 0 
 			END AS compliance_percentage
 		FROM employees e
+		LEFT JOIN employee_working_days ewd ON ewd.employee_id = e.id
 		LEFT JOIN attendance_logs al ON al.employee_id = e.id 
 			AND EXTRACT(MONTH FROM al.attendance_date) = ? 
 			AND EXTRACT(YEAR FROM al.attendance_date) = ?
 			AND al.deleted_at IS NULL
 		LEFT JOIN mutabaah_logs ml ON ml.attendance_log_id = al.id AND ml.deleted_at IS NULL
 		WHERE e.deleted_at IS NULL
-		GROUP BY e.id, e.full_name, e.is_trainer
+		GROUP BY e.id, e.full_name, e.is_trainer, ewd.total_working_days
 		ORDER BY compliance_percentage DESC, e.full_name ASC
 	`
-	err = db.Raw(query, month, year).Scan(&results).Error
+	err = db.Raw(query, year, month, year, month, month, year).Scan(&results).Error
 	return results, err
 }
 
@@ -310,10 +347,22 @@ func (r *mutabaahRepository) GetCategoryReport(ctx context.Context, tx Transacti
 				ELSE 0
 			END AS average_compliance
 		FROM employees e
+		INNER JOIN employee_schedules es
+			ON es.employee_id = e.id
+			AND es.is_active = TRUE
+			AND es.effective_date <= ?::DATE
+			AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+			AND es.deleted_at IS NULL
+		INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		INNER JOIN shift_template_details std
+			ON std.shift_template_id = st.id
+			AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+			AND std.is_working_day = TRUE
+			AND std.deleted_at IS NULL
 		LEFT JOIN mutabaah_logs ml ON ml.employee_id = e.id AND ml.log_date = ?::DATE AND ml.deleted_at IS NULL
 		WHERE e.deleted_at IS NULL
 		GROUP BY e.is_trainer
 	`
-	err = db.Raw(query, date).Scan(&results).Error
+	err = db.Raw(query, date, date, date, date).Scan(&results).Error
 	return results, err
 }

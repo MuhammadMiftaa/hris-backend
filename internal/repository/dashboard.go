@@ -23,7 +23,7 @@ type DashboardRepository interface {
 	GetExpiringContracts(ctx context.Context, days int) ([]dto.ExpiringContractDTO, error)
 	GetFastestArrivalRanking(ctx context.Context, year int, month int, limit int) ([]dto.RankingEntryDTO, error)
 	GetTopTilawahByDepartment(ctx context.Context, year int, month int, limit int) ([]dto.DepartmentRankingDTO, error)
-	GetMostLateRanking(ctx context.Context, year int, month int, limit int) ([]dto.RankingEntryDTO, error)
+	GetFastestMutabaahRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error)
 	GetRecentAttendanceMeta(ctx context.Context, employeeID uint) ([]dto.Meta, error)
 	GetLeaveTypeMeta(ctx context.Context) ([]dto.Meta, error)
 }
@@ -194,20 +194,47 @@ func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date
 	var summary dto.TeamAttendanceSummaryDTO
 	err := r.getDB(ctx).Raw(`
 		SELECT
-			(SELECT COUNT(*) FROM employees       WHERE deleted_at IS NULL)                                                        AS total_employees,
+			(SELECT COUNT(DISTINCT e.id)
+			 FROM employees e
+			 INNER JOIN employee_schedules es
+				 ON es.employee_id = e.id
+				 AND es.is_active = TRUE
+				 AND es.effective_date <= ?::DATE
+				 AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+				 AND es.deleted_at IS NULL
+			 INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+			 INNER JOIN shift_template_details std
+				 ON std.shift_template_id = st.id
+				 AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+				 AND std.is_working_day = TRUE
+				 AND std.deleted_at IS NULL
+			 WHERE e.deleted_at IS NULL
+			) AS total_employees,
 			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'present'      AND deleted_at IS NULL) AS present_today,
 			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'late'         AND deleted_at IS NULL) AS late_today,
 			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'leave'        AND deleted_at IS NULL) AS on_leave
-	`, date, date, date).Scan(&summary).Error
+	`, date, date, date, date, date, date).Scan(&summary).Error
 	if err != nil {
 		return summary, err
 	}
 
 	var mapped int
 	r.getDB(ctx).Raw(`
-		SELECT COUNT(DISTINCT employee_id) FROM attendance_logs
-		WHERE attendance_date = ?::DATE AND deleted_at IS NULL
-	`, date).Scan(&mapped)
+		SELECT COUNT(DISTINCT al.employee_id) FROM attendance_logs al
+		INNER JOIN employee_schedules es
+			ON es.employee_id = al.employee_id
+			AND es.is_active = TRUE
+			AND es.effective_date <= ?::DATE
+			AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+			AND es.deleted_at IS NULL
+		INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		INNER JOIN shift_template_details std
+			ON std.shift_template_id = st.id
+			AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+			AND std.is_working_day = TRUE
+			AND std.deleted_at IS NULL
+		WHERE al.attendance_date = ?::DATE AND al.deleted_at IS NULL
+	`, date, date, date, date).Scan(&mapped)
 
 	summary.NotClockedIn = summary.TotalEmployees - mapped
 	if summary.NotClockedIn < 0 {
@@ -368,35 +395,26 @@ func (r *dashboardRepository) GetTopTilawahByDepartment(ctx context.Context, yea
 	return list, err
 }
 
-func (r *dashboardRepository) GetMostLateRanking(ctx context.Context, year int, month int, limit int) ([]dto.RankingEntryDTO, error) {
+func (r *dashboardRepository) GetFastestMutabaahRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error) {
 	var list []dto.RankingEntryDTO
 	query := `
-		WITH LateEmployees AS (
-			SELECT
-				al.employee_id,
-				e.full_name,
-				e.employee_number,
-				SUM(al.late_minutes) AS total_late
-			FROM attendance_logs al
-			JOIN employees e ON e.id = al.employee_id
-			WHERE EXTRACT(YEAR FROM al.attendance_date) = ?
-			  AND EXTRACT(MONTH FROM al.attendance_date) = ?
-			  AND al.late_minutes > 0
-			  AND al.deleted_at IS NULL
-			GROUP BY al.employee_id, e.full_name, e.employee_number
-		)
 		SELECT
-			RANK() OVER (ORDER BY total_late DESC) AS rank,
-			employee_id,
-			full_name AS employee_name,
-			employee_number,
-			total_late AS value,
-			total_late || 'm' AS value_label
-		FROM LateEmployees
-		ORDER BY total_late DESC
+			RANK() OVER (ORDER BY ml.submitted_at ASC) AS rank,
+			ml.employee_id,
+			e.full_name AS employee_name,
+			e.employee_number,
+			EXTRACT(EPOCH FROM (ml.submitted_at - al.clock_in_at)) / 60.0 AS value,
+			TO_CHAR(ml.submitted_at, 'HH24:MI') AS value_label
+		FROM mutabaah_logs ml
+		JOIN employees e ON e.id = ml.employee_id
+		JOIN attendance_logs al ON al.id = ml.attendance_log_id AND al.deleted_at IS NULL
+		WHERE ml.log_date = ?::DATE
+		  AND ml.is_submitted = TRUE
+		  AND ml.deleted_at IS NULL
+		ORDER BY ml.submitted_at ASC
 		LIMIT ?
 	`
-	err := r.getDB(ctx).Raw(query, year, month, limit).Scan(&list).Error
+	err := r.getDB(ctx).Raw(query, date, limit).Scan(&list).Error
 	return list, err
 }
 

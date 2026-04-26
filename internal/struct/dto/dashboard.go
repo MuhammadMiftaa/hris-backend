@@ -129,9 +129,9 @@ type DepartmentRankingDTO struct {
 
 // DashboardRankingsResponse — 3 ranking sekaligus
 type DashboardRankingsResponse struct {
-	FastestArrival []RankingEntryDTO      `json:"fastest_arrival"`
-	TopTilawah     []DepartmentRankingDTO `json:"top_tilawah"`
-	MostLate       []RankingEntryDTO      `json:"most_late"`
+	FastestArrival  []RankingEntryDTO      `json:"fastest_arrival"`
+	TopTilawah      []DepartmentRankingDTO `json:"top_tilawah"`
+	FastestMutabaah []RankingEntryDTO      `json:"fastest_mutabaah"`
 }
 
 // DashboardMetadataResponse — return used by Dashboard Quick Requests Modal

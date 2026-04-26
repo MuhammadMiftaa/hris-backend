@@ -1,6 +1,7 @@
 package route
 
 import (
+	"hris-backend/config/storage"
 	"hris-backend/interface/http/handler"
 	"hris-backend/interface/http/middleware"
 	"hris-backend/internal/repository"
@@ -11,11 +12,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func BusinessTripRoutes(app *fiber.App, db *gorm.DB) {
+func BusinessTripRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 	repo := repository.NewBusinessTripRepository(db)
 	attendRepo := repository.NewAttendanceRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewBusinessTripService(repo, attendRepo, txManager)
+	svc := service.NewBusinessTripService(repo, attendRepo, txManager, minio)
 	h := handler.NewBusinessTripHandler(svc)
 
 	trips := app.Group("/business-trips")
