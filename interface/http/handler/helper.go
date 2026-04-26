@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"strings"
 
+	"hris-backend/config/log"
 	"hris-backend/internal/struct/dto"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,6 +17,7 @@ func getAccountFromCtx(c *fiber.Ctx) dto.GetEmployeeByIDResponse {
 }
 
 func respondBadRequest(c *fiber.Ctx, msg string) error {
+	log.Error(fmt.Sprintf("Error: %s", msg))
 	return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
 		Status:     false,
 		StatusCode: fiber.StatusBadRequest,
@@ -37,6 +40,7 @@ func respondError(c *fiber.Ctx, err error) error {
 		statusCode = fiber.StatusConflict
 	}
 
+	log.Error(fmt.Sprintf("Error: %s", err.Error()))
 	return c.Status(statusCode).JSON(dto.APIResponse{
 		Status:     false,
 		StatusCode: statusCode,

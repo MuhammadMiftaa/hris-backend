@@ -629,6 +629,12 @@ func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint,
 		return dto.AttendanceOverrideResponse{}, fmt.Errorf("attendance log not found: %w", err)
 	}
 
+	if roleLevel == string(model.RoleLevelManager) || roleLevel == string(model.RoleLevelStaff) {
+		if attendanceLog.EmployeeID != employeeID {
+			return dto.AttendanceOverrideResponse{}, fmt.Errorf("you are not authorized to override this attendance log")
+		}
+	}
+
 	var parsedIn, parsedOut *time.Time
 	if req.CorrectedClockIn != nil {
 		t, e := utils.ParseTimeString(*req.CorrectedClockIn, attendanceLog.AttendanceDate)
@@ -672,7 +678,7 @@ func (s *attendanceService) CreateOverride(ctx context.Context, employeeID uint,
 	}
 
 	// Auto-approve jika admin/superadmin — panggil UpdateOverrideStatus secara normal
-	if roleLevel == "superadmin" || roleLevel == "admin" {
+	if roleLevel == string(model.RoleLevelSuperAdmin) || roleLevel == string(model.RoleLevelAdmin) {
 		return s.UpdateOverrideStatus(ctx, employeeID, roleLevel, created.ID, dto.UpdateOverrideStatusRequest{
 			Status: "approved",
 		})
