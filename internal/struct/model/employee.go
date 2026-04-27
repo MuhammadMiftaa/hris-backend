@@ -10,8 +10,10 @@ import (
 // ENUM TYPES
 // =============================================================================
 
-type GenderEnum string
-type MaritalStatusEnum string
+type (
+	GenderEnum        string
+	MaritalStatusEnum string
+)
 
 const (
 	GenderMale   GenderEnum = "male"
@@ -42,7 +44,7 @@ type Employee struct {
 	Height         *float64           `gorm:"type:numeric(5,2)"                         json:"height"`
 	Weight         *float64           `gorm:"type:numeric(5,2)"                         json:"weight"`
 	PhotoURL       *string            `gorm:"type:text"                                 json:"photo_url"`
-	IsTrainer      bool               `gorm:"not null;default:false"                    json:"is_trainer"`
+	IsTrainer      *bool              `gorm:"not null;default:false"                    json:"is_trainer"`
 	BranchID       *uint              `gorm:"index"                                     json:"branch_id"`
 	DepartmentID   *uint              `gorm:"index"                                     json:"department_id"`
 	JobPositionsID *uint              `gorm:"index"                                     json:"job_positions_id"`

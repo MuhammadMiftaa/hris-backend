@@ -17,7 +17,12 @@ func getAccountFromCtx(c *fiber.Ctx) dto.GetEmployeeByIDResponse {
 }
 
 func respondBadRequest(c *fiber.Ctx, msg string) error {
-	log.Error(fmt.Sprintf("Error: %s", msg))
+	account := getAccountFromCtx(c)
+	log.Error(fmt.Sprintf("Error: %s", msg), map[string]any{
+		"account_id": account.AccountID,
+		"full_name":  account.FullName,
+		"email":      account.Email,
+	})
 	return c.Status(fiber.StatusBadRequest).JSON(dto.APIResponse{
 		Status:     false,
 		StatusCode: fiber.StatusBadRequest,
@@ -40,7 +45,13 @@ func respondError(c *fiber.Ctx, err error) error {
 		statusCode = fiber.StatusConflict
 	}
 
-	log.Error(fmt.Sprintf("Error: %s", err.Error()))
+	account := getAccountFromCtx(c)
+	log.Error(fmt.Sprintf("Error: %s", err.Error()), map[string]any{
+		"status_code": statusCode,
+		"account_id":  account.AccountID,
+		"full_name":   account.FullName,
+		"email":       account.Email,
+	})
 	return c.Status(statusCode).JSON(dto.APIResponse{
 		Status:     false,
 		StatusCode: statusCode,

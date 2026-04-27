@@ -48,7 +48,7 @@ const resetColor = "\x1b[0m"
 
 // writeHeader writes the "[timestamp] LEVEL: message" prefix.
 func (f *ApacheStyleFormatter) writeHeader(b *bytes.Buffer, entry *logrus.Entry) {
-	timestamp := entry.Time.Format("02/Jan/2006:15:04:05 -0700")
+	timestamp := entry.Time.In(time.FixedZone("WIB", 7*60*60)).Format("02/Jan/2006:15:04:05 -0700")
 	level := strings.ToUpper(entry.Level.String())
 
 	if f.NoColors {
@@ -143,7 +143,7 @@ func setupProductionLogger(l *logrus.Logger) {
 
 func setupStagingLogger(l *logrus.Logger) {
 	l.SetLevel(logrus.TraceLevel)
-	l.SetFormatter(&ApacheStyleFormatter{NoColors: true})
+	l.SetFormatter(&ApacheStyleFormatter{NoColors: false})
 	l.SetOutput(os.Stdout)
 	l.Debug("Staging Log")
 }

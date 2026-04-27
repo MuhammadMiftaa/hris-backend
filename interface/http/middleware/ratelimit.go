@@ -18,7 +18,7 @@ type RateLimitConfig struct {
 
 func DefaultRateLimitConfig() RateLimitConfig {
 	return RateLimitConfig{
-		Max:    300,
+		Max:    500,
 		Window: 1 * time.Minute,
 	}
 }

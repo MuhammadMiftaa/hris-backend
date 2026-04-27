@@ -22,10 +22,7 @@ func LoggerMiddleware() fiber.Handler {
 		statusCode := c.Response().StatusCode()
 
 		requestID, _ := c.Locals(data.REQUEST_ID_LOCAL_KEY).(string)
-		userID := ""
-		if userData, ok := c.Locals("user_data").(dto.UserData); ok {
-			userID = userData.ID
-		}
+		account, _ := c.Locals("account").(dto.GetEmployeeByIDResponse)
 
 		fields := map[string]any{
 			"request_id":    requestID,
@@ -35,10 +32,9 @@ func LoggerMiddleware() fiber.Handler {
 			"latency":       fmt.Sprintf("%.3fms", float64(latency.Nanoseconds())/1e6),
 			"client_ip":     c.IP(),
 			"response_size": len(c.Response().Body()),
-		}
-
-		if userID != "" {
-			fields["user_id"] = userID
+			"account_id":    account.AccountID,
+			"full_name":     account.FullName,
+			"email":         account.Email,
 		}
 
 		switch {

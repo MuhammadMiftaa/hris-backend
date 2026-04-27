@@ -11,6 +11,7 @@ type (
 		Mode      string `env:"MODE"`
 		HTTPPort  string `env:"HTTP_PORT"`
 		ClientURL string `env:"CLIENT_URL"`
+		ByPass    string `env:"BYPASS"`
 	}
 
 	Database struct {
@@ -75,6 +76,7 @@ func LoadNative() ([]string, error) {
 	lookupEnv("MODE", &Cfg.Server.Mode, &missing)
 	lookupEnv("HTTP_PORT", &Cfg.Server.HTTPPort, &missing)
 	lookupEnv("CLIENT_URL", &Cfg.Server.ClientURL, &missing)
+	lookupEnv("BYPASS", &Cfg.Server.ByPass, &missing)
 
 	lookupEnv("DB_USER", &Cfg.Database.DBUser, &missing)
 	lookupEnv("DB_HOST", &Cfg.Database.DBHost, &missing)

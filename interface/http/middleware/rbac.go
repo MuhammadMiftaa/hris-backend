@@ -30,10 +30,11 @@ func RBACMiddleware(permNeed ...string) fiber.Handler {
 		}
 
 		if !isAllowed {
-			log.Debug(fmt.Sprintf("Permission denied for user %d", c.Locals("employee_id"), map[string]any{
+			account, _ := c.Locals("account").(dto.GetEmployeeByIDResponse)
+			log.Debug(fmt.Sprintf("Permission denied for user with ID: %d and Name: %s", account.AccountID, account.FullName), map[string]any{
 				"permissions":        permList,
 				"permissions_needed": permNeed,
-			}))
+			})
 			return c.Status(fiber.StatusForbidden).JSON(dto.APIResponse{
 				Status:     false,
 				StatusCode: 403,
