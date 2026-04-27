@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,14 +70,19 @@ func writeFields(b *bytes.Buffer, fields logrus.Fields) {
 	if len(fields) == 0 {
 		return
 	}
+
+	keys := make([]string, 0, len(fields))
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	fmt.Fprint(b, " - ")
-	first := true
-	for key, value := range fields {
-		if !first {
+	for i, key := range keys {
+		if i > 0 {
 			fmt.Fprint(b, ", ")
 		}
-		fmt.Fprintf(b, "%s: %s", key, formatFieldValue(value))
-		first = false
+		fmt.Fprintf(b, "%s: %s", key, formatFieldValue(fields[key]))
 	}
 }
 
@@ -103,6 +109,19 @@ func (f *ApacheStyleFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	writeFields(&b, entry.Data)
 	b.WriteByte('\n')
 	return b.Bytes(), nil
+}
+
+type TimezoneHook struct {
+	Location *time.Location
+}
+
+func (h *TimezoneHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (h *TimezoneHook) Fire(entry *logrus.Entry) error {
+	entry.Time = entry.Time.In(h.Location)
+	return nil
 }
 
 var Log *logrus.Logger
@@ -133,6 +152,7 @@ func setupProductionLogger(l *logrus.Logger) {
 			logrus.FieldKeyFunc:  "function",
 		},
 	})
+	l.AddHook(&TimezoneHook{Location: time.FixedZone("WIB", 7*60*60)})
 	file, err := os.OpenFile(".server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		l.Fatal("Failed to open log file:", err)
