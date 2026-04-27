@@ -20,7 +20,7 @@ type AttendanceService interface {
 	GetTodayStatus(ctx context.Context, employeeID uint) (dto.AttendanceTodayResponse, error)
 	ClockIn(ctx context.Context, employeeID uint, req dto.ClockInRequest) (dto.AttendanceLogResponse, error)
 	ClockOut(ctx context.Context, employeeID uint, req dto.ClockOutRequest) (dto.AttendanceLogResponse, error)
-	GetAllLogs(ctx context.Context, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error)
+	GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error)
 	GetMetadata(ctx context.Context) (dto.AttendanceMetadata, error)
 	CreateManualAttendance(ctx context.Context, employeeID uint, req dto.CreateManualAttendanceRequest) (dto.AttendanceLogResponse, error)
 	GetAllOverrides(ctx context.Context, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error)
@@ -497,7 +497,7 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 	return *resp, nil
 }
 
-func (s *attendanceService) GetAllLogs(ctx context.Context, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error) {
+func (s *attendanceService) GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error) {
 	logs, err := s.repo.GetAllLogs(ctx, nil, params)
 	if err != nil {
 		return nil, err
@@ -505,8 +505,13 @@ func (s *attendanceService) GetAllLogs(ctx context.Context, params dto.Attendanc
 
 	// Resolve presigned URLs for photo fields
 	for i := range logs {
-		logs[i].ClockInPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockInPhotoURL)
-		logs[i].ClockOutPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockOutPhotoURL)
+		if roleLevel == string(model.RoleLevelAdmin) || roleLevel == string(model.RoleLevelSuperAdmin) {
+			logs[i].ClockInPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockInPhotoURL)
+			logs[i].ClockOutPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockOutPhotoURL)
+		} else {
+			logs[i].ClockInPhotoURL = nil
+			logs[i].ClockOutPhotoURL = nil
+		}
 	}
 
 	return logs, nil
