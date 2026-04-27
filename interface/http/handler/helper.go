@@ -38,6 +38,7 @@ func respondError(c *fiber.Ctx, err error) error {
 	if strings.Contains(lowerMsg, "record not found") || strings.Contains(lowerMsg, "not found") {
 		statusCode = fiber.StatusNotFound
 	} else if strings.Contains(lowerMsg, "bad request") || strings.Contains(lowerMsg, "invalid") {
+		errMsg = strings.ReplaceAll(errMsg, "bad request: ", "")
 		statusCode = fiber.StatusBadRequest
 	} else if strings.Contains(lowerMsg, "unauthorized") {
 		statusCode = fiber.StatusUnauthorized

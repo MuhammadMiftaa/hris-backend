@@ -195,7 +195,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("get existing log: %w", err)
 	}
 	if existing != nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("sudah melakukan clock in hari ini")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: sudah melakukan clock in hari ini")
 	}
 
 	// 2. Cek hari libur
@@ -208,7 +208,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("check holiday: %w", err)
 	}
 	if isHoliday {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("hari ini adalah hari libur: %s", holidayName)
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: hari ini adalah hari libur: %s", holidayName)
 	}
 
 	// 3. Cek cuti yang disetujui
@@ -217,7 +217,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("check leave: %w", err)
 	}
 	if leaveID != nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("anda memiliki cuti yang disetujui untuk hari ini")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: anda memiliki cuti yang disetujui untuk hari ini")
 	}
 
 	// 4. Ambil jadwal shift aktif
@@ -226,10 +226,10 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("get schedule: %w", err)
 	}
 	if shift == nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("tidak ada jadwal shift aktif untuk hari ini")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: tidak ada jadwal shift aktif untuk hari ini")
 	}
 	if !shift.IsWorkingDay {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("hari ini bukan hari kerja sesuai jadwal shift")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: hari ini bukan hari kerja sesuai jadwal shift")
 	}
 
 	// 5. Cek dinas luar (business trip)
@@ -253,13 +253,13 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 
 	if s.isGPSCheckRequired(isBusinessTrip, shift, branch) {
 		if branchID == nil {
-			return dto.AttendanceLogResponse{}, fmt.Errorf("pegawai tidak memiliki cabang yang terdaftar")
+			return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: pegawai tidak memiliki kantor yang terdaftar")
 		}
 		if branch == nil {
-			return dto.AttendanceLogResponse{}, fmt.Errorf("data cabang tidak ditemukan")
+			return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: data kantor tidak ditemukan")
 		}
 		if branch.Latitude == nil || branch.Longitude == nil {
-			return dto.AttendanceLogResponse{}, fmt.Errorf("koordinat cabang belum dikonfigurasi")
+			return dto.AttendanceLogResponse{}, fmt.Errorf("koordinat kantor belum dikonfigurasi")
 		}
 		dist := utils.HaversineDistance(req.Latitude, req.Longitude, *branch.Latitude, *branch.Longitude)
 		if dist > float64(branch.RadiusMeters) {
@@ -298,7 +298,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 
 	// 7. Photo key validasi
 	if req.PhotoKey == "" {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("foto clock in wajib diisi")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: foto clock in wajib diisi")
 	}
 
 	var permissionRequestID *uint
@@ -368,10 +368,10 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 		return dto.AttendanceLogResponse{}, fmt.Errorf("get today log: %w", err)
 	}
 	if existing == nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("belum melakukan clock in hari ini")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: belum melakukan clock in hari ini")
 	}
 	if existing.ClockOutAt != nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("sudah melakukan clock out hari ini")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: sudah melakukan clock out hari ini")
 	}
 
 	shift, err := s.repo.GetActiveSchedule(ctx, nil, employeeID, today)
@@ -402,7 +402,7 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 			dist := utils.HaversineDistance(req.Latitude, req.Longitude, *branch.Latitude, *branch.Longitude)
 			if dist > float64(branch.RadiusMeters) {
 				return dto.AttendanceLogResponse{}, fmt.Errorf(
-					"lokasi anda (%.0f meter) di luar radius presensi yang diizinkan (%d meter)",
+					"bad request: lokasi anda (%.0f meter) di luar radius presensi yang diizinkan (%d meter)",
 					dist, branch.RadiusMeters,
 				)
 			}
@@ -451,7 +451,7 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 
 	// 4. Photo key validasi
 	if req.PhotoKey == "" {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("foto clock out wajib diisi")
+		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: foto clock out wajib diisi")
 	}
 
 	updates := map[string]interface{}{
