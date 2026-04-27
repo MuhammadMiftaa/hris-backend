@@ -45,17 +45,19 @@ func getRoleWeight(level string) int {
 }
 
 type attendanceService struct {
-	repo      repository.AttendanceRepository
-	txManager repository.TxManager
-	minio     storage.MinioClient
+	repo         repository.AttendanceRepository
+	mutabaahRepo repository.MutabaahRepository
+	txManager    repository.TxManager
+	minio        storage.MinioClient
 }
 
 func NewAttendanceService(
 	repo repository.AttendanceRepository,
+	mutabaahRepo repository.MutabaahRepository,
 	txManager repository.TxManager,
 	minio storage.MinioClient,
 ) AttendanceService {
-	return &attendanceService{repo: repo, txManager: txManager, minio: minio}
+	return &attendanceService{repo: repo, mutabaahRepo: mutabaahRepo, txManager: txManager, minio: minio}
 }
 
 func (s *attendanceService) PresignClockPhoto(ctx context.Context, employeeID uint, action string) (dto.AttendancePresignResponse, error) {
@@ -334,6 +336,15 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 	created, err := s.repo.CreateLog(ctx, tx, logModel)
 	if err != nil {
 		return dto.AttendanceLogResponse{}, fmt.Errorf("create log: %w", err)
+	}
+
+	// --- Auto-link pending mutabaah ---
+	todayStr := utils.TodayDate()
+	pendingMutabaah, errMutabaah := s.mutabaahRepo.GetTodayLog(ctx, tx, employeeID, todayStr)
+	if errMutabaah == nil && pendingMutabaah != nil && pendingMutabaah.AttendanceLogID == nil {
+		_ = s.mutabaahRepo.UpdateLog(ctx, tx, pendingMutabaah.ID, map[string]interface{}{
+			"attendance_log_id": created.ID,
+		})
 	}
 
 	if err := tx.Commit(); err != nil {

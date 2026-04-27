@@ -39,10 +39,6 @@ func (h *MutabaahHandler) Submit(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return respondBadRequest(c, "invalid request body")
 	}
-	if req.AttendanceLogID == 0 {
-		return respondBadRequest(c, "attendance_log_id is required")
-	}
-
 	result, err := h.service.Submit(c.Context(), account.EmployeeID, account.IsTrainer, req)
 	if err != nil {
 		return respondError(c, err)

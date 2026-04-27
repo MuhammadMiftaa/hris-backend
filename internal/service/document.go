@@ -12,6 +12,22 @@ import (
 	"hris-backend/internal/utils"
 )
 
+// sanitizeObjectKeyFilename menghapus/replace karakter yang tidak valid untuk MinIO object names
+func sanitizeObjectKeyFilename(filename string) string {
+	result := strings.ReplaceAll(filename, " ", "_")
+	var clean strings.Builder
+	for _, r := range result {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			clean.WriteRune(r)
+		}
+	}
+	if clean.Len() == 0 {
+		return "document.bin"
+	}
+	return clean.String()
+}
+
 type DocumentService interface {
 	UploadDocument(ctx context.Context, employeeID uint, req dto.UploadDocumentRequest) (dto.UploadDocumentResponse, error)
 	GetDownloadURL(ctx context.Context, req dto.DocumentDownloadRequest) (dto.DocumentDownloadResponse, error)
@@ -66,7 +82,8 @@ func (s *documentService) UploadDocument(ctx context.Context, employeeID uint, r
 	}
 
 	// Upload to MinIO
-	objectKey := fmt.Sprintf("%d/%d_%s", employeeID, time.Now().Unix(), req.Filename)
+	safeFilename := sanitizeObjectKeyFilename(req.Filename)
+	objectKey := fmt.Sprintf("%d/%d_%s", employeeID, time.Now().Unix(), safeFilename)
 
 	uploadURL, err := s.minio.PresignedPutObject(ctx, bucket, objectKey, storage.PresignedUploadExpiry)
 	if err != nil {
@@ -108,9 +125,16 @@ func (s *documentService) GetDownloadURL(ctx context.Context, req dto.DocumentDo
 		return dto.DocumentDownloadResponse{}, fmt.Errorf("tipe dokumen tidak valid")
 	}
 
-	url, err := s.minio.PresignedGetObject(ctx, bucket, req.Key, storage.PresignedDownloadExpiry)
+	key := req.Key
+	if strings.HasPrefix(key, "http://") || strings.HasPrefix(key, "https://") {
+		return dto.DocumentDownloadResponse{
+			URL: key,
+		}, nil
+	}
+
+	url, err := s.minio.PresignedGetObject(ctx, bucket, key, storage.PresignedDownloadExpiry)
 	if err != nil {
-		return dto.DocumentDownloadResponse{}, fmt.Errorf("gagal generate download URL: %w", err)
+		return dto.DocumentDownloadResponse{}, fmt.Errorf("gagal generate download URL (bucket=%s, key=%s): %w", bucket, key, err)
 	}
 
 	return dto.DocumentDownloadResponse{

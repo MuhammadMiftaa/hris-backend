@@ -14,8 +14,9 @@ import (
 
 func AttendanceRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 	repo := repository.NewAttendanceRepository(db)
+	mutabaahRepo := repository.NewMutabaahRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewAttendanceService(repo, txManager, minio)
+	svc := service.NewAttendanceService(repo, mutabaahRepo, txManager, minio)
 	h := handler.NewAttendanceHandler(svc)
 
 	attendance := app.Group("/attendance")

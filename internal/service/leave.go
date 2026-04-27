@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	logger "hris-backend/config/log"
 	"hris-backend/config/storage"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
@@ -75,6 +76,12 @@ func (s *leaveService) GetAllRequests(ctx context.Context, params dto.LeaveReque
 			url, err := s.minio.PresignedGetObject(ctx, storage.BucketLeaveDocuments, *reqs[i].DocumentURL, storage.PresignedDownloadExpiry)
 			if err == nil {
 				reqs[i].DocumentURL = &url
+			} else {
+				logger.Warn("presign leave document failed", map[string]any{
+					"request_id": reqs[i].ID,
+					"key":        *reqs[i].DocumentURL,
+					"error":      err.Error(),
+				})
 			}
 		}
 	}
@@ -90,6 +97,12 @@ func (s *leaveService) GetRequestByID(ctx context.Context, id uint) (dto.LeaveRe
 		url, err := s.minio.PresignedGetObject(ctx, storage.BucketLeaveDocuments, *res.DocumentURL, storage.PresignedDownloadExpiry)
 		if err == nil {
 			res.DocumentURL = &url
+		} else {
+			logger.Warn("presign leave document failed", map[string]any{
+				"request_id": res.ID,
+				"key":        *res.DocumentURL,
+				"error":      err.Error(),
+			})
 		}
 	}
 	return *res, nil

@@ -9,7 +9,7 @@ import (
 type MutabaahLog struct {
 	ID              uint           `gorm:"primaryKey;autoIncrement"                          json:"id"`
 	EmployeeID      uint           `gorm:"not null;index;uniqueIndex:uq_mutabaah"            json:"employee_id"`
-	AttendanceLogID uint           `gorm:"not null;index"                                    json:"attendance_log_id"`
+	AttendanceLogID *uint          `gorm:"index"                                             json:"attendance_log_id"`
 	LogDate         time.Time      `gorm:"type:date;not null;uniqueIndex:uq_mutabaah"        json:"log_date"`
 	TargetPages     int            `gorm:"not null"                                          json:"target_pages"`
 	IsSubmitted     bool           `gorm:"not null;default:false"                            json:"is_submitted"`

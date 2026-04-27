@@ -109,7 +109,6 @@ func (s *dashboardService) buildMutabaahTodayStatus(ctx context.Context, employe
 	}
 
 	mutabaahLogID := mutabaahLog.ID
-	attendLogID := mutabaahLog.AttendanceLogID
 
 	return &dto.MutabaahTodayStatus{
 		HasRecord:       true,
@@ -117,7 +116,7 @@ func (s *dashboardService) buildMutabaahTodayStatus(ctx context.Context, employe
 		SubmittedAt:     submittedAt,
 		TargetPages:     mutabaahLog.TargetPages,
 		MutabaahLogID:   &mutabaahLogID,
-		AttendanceLogID: &attendLogID,
+		AttendanceLogID: mutabaahLog.AttendanceLogID,
 	}
 }
 

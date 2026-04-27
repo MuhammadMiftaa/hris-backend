@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	logger "hris-backend/config/log"
 	"hris-backend/config/storage"
 
 	"hris-backend/internal/repository"
@@ -52,6 +53,12 @@ func (s *businessTripService) GetAll(ctx context.Context, params dto.BusinessTri
 			url, err := s.minio.PresignedGetObject(ctx, storage.BucketBusinessTripDocuments, *reqs[i].DocumentURL, storage.PresignedDownloadExpiry)
 			if err == nil {
 				reqs[i].DocumentURL = &url
+			} else {
+				logger.Warn("presign business trip document failed", map[string]any{
+					"request_id": reqs[i].ID,
+					"key":        *reqs[i].DocumentURL,
+					"error":      err.Error(),
+				})
 			}
 		}
 	}
@@ -67,6 +74,12 @@ func (s *businessTripService) GetByID(ctx context.Context, id uint) (dto.Busines
 		url, err := s.minio.PresignedGetObject(ctx, storage.BucketBusinessTripDocuments, *res.DocumentURL, storage.PresignedDownloadExpiry)
 		if err == nil {
 			res.DocumentURL = &url
+		} else {
+			logger.Warn("presign business trip document failed", map[string]any{
+				"request_id": res.ID,
+				"key":        *res.DocumentURL,
+				"error":      err.Error(),
+			})
 		}
 	}
 	return *res, nil

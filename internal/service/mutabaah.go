@@ -74,10 +74,6 @@ func (s *mutabaahService) Submit(ctx context.Context, employeeID uint, isTrainer
 	today := utils.TodayDate()
 	now := utils.NowWIB()
 
-	if req.AttendanceLogID == 0 {
-		return dto.MutabaahLogResponse{}, fmt.Errorf("attendance_log_id is required")
-	}
-
 	existing, err := s.repo.GetTodayLog(ctx, nil, employeeID, today)
 	if err != nil {
 		return dto.MutabaahLogResponse{}, fmt.Errorf("get mutabaah log: %w", err)
@@ -115,12 +111,16 @@ func (s *mutabaahService) Submit(ctx context.Context, employeeID uint, isTrainer
 			return dto.MutabaahLogResponse{}, fmt.Errorf("mutabaah hari ini sudah disubmit, batalkan terlebih dahulu jika ingin mengubah")
 		}
 
-		err = s.repo.UpdateLog(ctx, tx, existing.ID, map[string]interface{}{
-			"attendance_log_id": req.AttendanceLogID,
-			"is_submitted":      true,
-			"submitted_at":      now,
-			"updated_at":        now,
-		})
+		updates := map[string]interface{}{
+			"is_submitted": true,
+			"submitted_at": now,
+			"updated_at":   now,
+		}
+		if req.AttendanceLogID != nil {
+			updates["attendance_log_id"] = *req.AttendanceLogID
+		}
+
+		err = s.repo.UpdateLog(ctx, tx, existing.ID, updates)
 		if err != nil {
 			return dto.MutabaahLogResponse{}, fmt.Errorf("update mutabaah: %w", err)
 		}

@@ -95,7 +95,7 @@ type AttendanceListParams struct {
 }
 
 type MutabaahSubmitRequest struct {
-	AttendanceLogID uint `json:"attendance_log_id"`
+	AttendanceLogID *uint `json:"attendance_log_id,omitempty"`
 }
 
 type MutabaahCancelRequest struct {
@@ -106,7 +106,7 @@ type MutabaahLogResponse struct {
 	ID              uint       `json:"id"`
 	EmployeeID      uint       `json:"employee_id"`
 	EmployeeName    string     `json:"employee_name"`
-	AttendanceLogID uint       `json:"attendance_log_id"`
+	AttendanceLogID *uint      `json:"attendance_log_id"`
 	LogDate         string     `json:"log_date"`
 	TargetPages     int        `json:"target_pages"`
 	IsSubmitted     bool       `json:"is_submitted"`

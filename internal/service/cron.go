@@ -174,9 +174,10 @@ func (s *cronService) RunDailyMutabaahMark(ctx context.Context, date string) err
 
 	logs := make([]model.MutabaahLog, 0, len(rows))
 	for _, row := range rows {
+		attID := row.AttendanceLogID
 		logs = append(logs, model.MutabaahLog{
 			EmployeeID:      row.EmployeeID,
-			AttendanceLogID: row.AttendanceLogID,
+			AttendanceLogID: &attID,
 			LogDate:         parsedDate,
 			TargetPages:     0,
 			IsSubmitted:     false,
