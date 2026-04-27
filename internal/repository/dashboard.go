@@ -428,7 +428,7 @@ func (r *dashboardRepository) GetRecentAttendanceMeta(ctx context.Context, emplo
 					WHEN clock_in_at IS NOT NULL AND clock_out_at IS NOT NULL 
 					THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || TO_CHAR(clock_out_at, 'FMHH24:MI') || ')'
 					WHEN clock_in_at IS NOT NULL 
-					THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ??)'
+					THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || CHR(63) || ')'
 					ELSE '' 
 				END AS name
 		FROM attendance_logs
@@ -445,4 +445,3 @@ func (r *dashboardRepository) GetLeaveTypeMeta(ctx context.Context) ([]dto.Meta,
 	err := r.getDB(ctx).Raw("SELECT id::TEXT AS id, name FROM leave_types WHERE deleted_at IS NULL ORDER BY name ASC").Scan(&meta).Error
 	return meta, err
 }
-

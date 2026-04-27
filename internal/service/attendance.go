@@ -728,10 +728,14 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 	}
 	defer tx.Rollback()
 
+	notes := ov.Reason
+	if req.Status == string(model.RequestStatusRejected) && req.ApproverNotes != nil {
+		notes = fmt.Sprintf("%s ditolak karena %s", ov.Reason, *req.ApproverNotes)
+	}
 	updates := map[string]interface{}{
 		"status":      req.Status,
 		"approved_by": employeeID,
-		"reason":      req.ApproverNotes,
+		"reason":      notes,
 	}
 
 	if err := s.repo.UpdateOverrideStatus(ctx, tx, id, updates); err != nil {
