@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"hris-backend/config/log"
 	"hris-backend/config/storage"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
@@ -557,7 +556,6 @@ func (s *attendanceService) CreateManualAttendance(ctx context.Context, employee
 
 	tIn, err := utils.ParseTimeString(req.ClockInAt, req.AttendanceDate)
 	if err != nil {
-		log.Debug("parse clock in time: %w", map[string]any{"Result": tIn, "clock in": req.ClockInAt, "date": req.AttendanceDate})
 		return dto.AttendanceLogResponse{}, fmt.Errorf("parse clock in time: %w", err)
 	}
 
@@ -565,7 +563,6 @@ func (s *attendanceService) CreateManualAttendance(ctx context.Context, employee
 	if req.ClockOutAt != nil {
 		tOut, err := utils.ParseTimeString(*req.ClockOutAt, req.AttendanceDate)
 		if err != nil {
-			log.Debug("parse clock out time: %w", map[string]any{"Result": tOut, "clock out": *req.ClockOutAt, "date": req.AttendanceDate})
 			return dto.AttendanceLogResponse{}, fmt.Errorf("parse clock out time: %w", err)
 		}
 		tOutPtr = &tOut
@@ -753,12 +750,6 @@ func (s *attendanceService) UpdateOverrideStatus(ctx context.Context, employeeID
 		if err != nil || attendanceLog == nil {
 			return dto.AttendanceOverrideResponse{}, fmt.Errorf("get attendance log: %w", err)
 		}
-		log.Debug("Attendance Log fetched", map[string]any{
-			"id":          attendanceLog.ID,
-			"employee_id": attendanceLog.EmployeeID,
-			"date":        attendanceLog.AttendanceDate,
-			"status":      attendanceLog.Status,
-		})
 
 		logUpds := make(map[string]interface{})
 

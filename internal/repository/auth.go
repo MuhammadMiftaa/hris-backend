@@ -12,7 +12,7 @@ import (
 )
 
 type AuthRepository interface {
-	GetAccountByEmail(ctx context.Context, tx Transaction, email string) (dto.GetAccountByEmailResponse, error)
+	GetAccountByEmail(ctx context.Context, tx Transaction, email string) (*dto.GetAccountByEmailResponse, error)
 	GetEmployeeByID(ctx context.Context, tx Transaction, id uint) (dto.GetEmployeeByIDResponse, error)
 	UpdateAccountLastLogin(ctx context.Context, tx Transaction, time time.Time, id uint) error
 }
@@ -38,13 +38,13 @@ func (r *authRepository) getDB(ctx context.Context, tx Transaction) (*gorm.DB, e
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *authRepository) GetAccountByEmail(ctx context.Context, tx Transaction, email string) (dto.GetAccountByEmailResponse, error) {
+func (r *authRepository) GetAccountByEmail(ctx context.Context, tx Transaction, email string) (*dto.GetAccountByEmailResponse, error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return dto.GetAccountByEmailResponse{}, err
+		return nil, err
 	}
 
-	var account dto.GetAccountByEmailResponse
+	var account *dto.GetAccountByEmailResponse
 
 	err = db.Raw(`
 		SELECT 
@@ -57,7 +57,7 @@ func (r *authRepository) GetAccountByEmail(ctx context.Context, tx Transaction, 
 		WHERE a.email = $1 AND a.deleted_at IS NULL
 	`, email).Scan(&account).Error
 	if err != nil {
-		return account, err
+		return nil, err
 	}
 
 	return account, nil

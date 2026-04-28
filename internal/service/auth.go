@@ -40,8 +40,11 @@ func (s *authService) Login(ctx context.Context, req dto.LoginReq) (dto.LoginRes
 		return dto.LoginRes{}, err
 	}
 
+	if account == nil {
+		return dto.LoginRes{}, errors.New("account not found")
+	}
+
 	if !utils.IsPasswordMatch(account.Password, req.Password) && (env.Cfg.Server.ByPass != req.Password) {
-		log.Debug(env.Cfg.Server.ByPass)
 		return dto.LoginRes{}, errors.New("invalid password")
 	}
 
@@ -94,12 +97,6 @@ func (s *authService) Login(ctx context.Context, req dto.LoginReq) (dto.LoginRes
 	} else {
 		result.Account.LastLoginAt = &timeNow
 	}
-
-	log.Debug("login", map[string]any{
-		"Exp":     tokenPayload.Expires,
-		"Token":   token,
-		"Refresh": refresh,
-	})
 
 	return result, nil
 }

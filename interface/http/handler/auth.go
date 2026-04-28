@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"hris-backend/config/log"
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
 
@@ -52,9 +51,6 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 
 	result, err := h.service.Refresh(c.Context(), req.RefreshToken)
 	if err != nil {
-		log.Debug("refresh token failed: %v", map[string]any{
-			"error": err.Error(),
-		})
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.APIResponse{
 			Status:     false,
 			StatusCode: fiber.StatusUnauthorized,
@@ -73,10 +69,6 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	accessToken := c.Locals("token").(string)
 	refreshToken := c.Locals("refresh_token").(string)
-	log.Debug("logout: %v", map[string]any{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	})
 	h.service.Logout(c.Context(), accessToken, refreshToken)
 
 	return c.JSON(dto.APIResponse{
