@@ -31,9 +31,10 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, mi
 		},
 		EnableTrustedProxyCheck: true,
 		TrustedProxies: []string{
-			"192.168.0.1",
+			"172.31.0.0/16",
+			"127.0.0.1",    
 		},
-		ProxyHeader: fiber.HeaderXForwardedFor,
+		ProxyHeader: "X-Real-IP",
 	})
 
 	app.Use(recover.New())
