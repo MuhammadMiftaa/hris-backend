@@ -7,19 +7,20 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type LeaveRepository interface {
 	// Balance
-	GetAllBalances(ctx context.Context, tx Transaction, params dto.LeaveBalanceListParams) ([]dto.LeaveBalanceResponse, error)
+	GetAllBalances(ctx context.Context, tx Transaction, params dto.LeaveBalanceListParams) (dto.PaginatedResponse[dto.LeaveBalanceResponse], error)
 	GetBalanceByEmployeeAndType(ctx context.Context, tx Transaction, employeeID uint, leaveTypeID uint, year int) (*dto.LeaveBalanceResponse, error)
 	CreateBalance(ctx context.Context, tx Transaction, m model.LeaveBalance) (model.LeaveBalance, error)
 	UpdateBalanceUsage(ctx context.Context, tx Transaction, id uint, usedOccurrences int, usedDuration int) error
 
 	// Request
-	GetAllRequests(ctx context.Context, tx Transaction, params dto.LeaveRequestListParams) ([]dto.LeaveRequestResponse, error)
+	GetAllRequests(ctx context.Context, tx Transaction, params dto.LeaveRequestListParams) (dto.PaginatedResponse[dto.LeaveRequestResponse], error)
 	GetRequestByID(ctx context.Context, tx Transaction, id uint) (*dto.LeaveRequestResponse, error)
 	CreateRequest(ctx context.Context, tx Transaction, m model.LeaveRequest) (model.LeaveRequest, error)
 	UpdateRequestStatus(ctx context.Context, tx Transaction, id uint, status string) error
@@ -58,17 +59,46 @@ func (r *leaveRepository) getDB(ctx context.Context, tx Transaction) (*gorm.DB, 
 }
 
 // Balance
-func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, params dto.LeaveBalanceListParams) ([]dto.LeaveBalanceResponse, error) {
+func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, params dto.LeaveBalanceListParams) (dto.PaginatedResponse[dto.LeaveBalanceResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.LeaveBalanceResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM leave_balances b
+		JOIN employees e ON e.id = b.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		JOIN leave_types t ON t.id = b.leave_type_id
+		WHERE b.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND b.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.Year != nil {
+		baseQuery += " AND b.year = ?"
+		args = append(args, *params.Year)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR t.name ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.LeaveBalanceResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			b.id,
 			b.employee_id,
 			e.full_name AS employee_name,
+			d.name AS department_name,
 			b.leave_type_id,
 			t.name AS leave_type_name,
 			b.year,
@@ -80,27 +110,31 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 			(t.max_total_duration_per_year - b.used_duration) AS remaining_duration,
 			b.created_at,
 			b.updated_at
-		FROM leave_balances b
-		JOIN employees e ON e.id = b.employee_id
-		JOIN leave_types t ON t.id = b.leave_type_id
-		WHERE b.deleted_at IS NULL
-	`
-	args := []interface{}{}
-
-	if params.EmployeeID != nil {
-		query += " AND b.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.Year != nil {
-		query += " AND b.year = ?"
-		args = append(args, *params.Year)
-	}
+	` + baseQuery
+	
+	selectQuery += utils.BuildSortClause("leave_balances", params.SortBy, params.GetSortDir(), "b.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.LeaveBalanceResponse
-	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.LeaveBalanceResponse]{}, err
 	}
-	return res, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.LeaveBalanceResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *leaveRepository) GetBalanceByEmployeeAndType(ctx context.Context, tx Transaction, employeeID uint, leaveTypeID uint, year int) (*dto.LeaveBalanceResponse, error) {
@@ -167,17 +201,54 @@ func (r *leaveRepository) UpdateBalanceUsage(ctx context.Context, tx Transaction
 }
 
 // Request
-func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, params dto.LeaveRequestListParams) ([]dto.LeaveRequestResponse, error) {
+func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, params dto.LeaveRequestListParams) (dto.PaginatedResponse[dto.LeaveRequestResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.LeaveRequestResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM leave_requests r
+		JOIN employees e ON e.id = r.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		JOIN leave_types t ON t.id = r.leave_type_id
+		WHERE r.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND r.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.Status != nil {
+		baseQuery += " AND r.status = ?"
+		args = append(args, *params.Status)
+	}
+	if params.LeaveTypeID != nil {
+		baseQuery += " AND r.leave_type_id = ?"
+		args = append(args, *params.LeaveTypeID)
+	}
+	if params.Year != nil {
+		baseQuery += " AND EXTRACT(YEAR FROM r.start_date) = ?"
+		args = append(args, *params.Year)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR r.reason ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.LeaveRequestResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			r.id,
 			r.employee_id,
 			e.full_name AS employee_name,
+			d.name AS department_name,
 			r.leave_type_id,
 			t.name AS leave_type_name,
 			t.category AS leave_category,
@@ -190,36 +261,31 @@ func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, pa
 			r.status,
 			r.created_at,
 			r.updated_at
-		FROM leave_requests r
-		JOIN employees e ON e.id = r.employee_id
-		JOIN leave_types t ON t.id = r.leave_type_id
-		WHERE r.deleted_at IS NULL
-	`
-	args := []interface{}{}
-
-	if params.EmployeeID != nil {
-		query += " AND r.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.Status != nil {
-		query += " AND r.status = ?"
-		args = append(args, *params.Status)
-	}
-	if params.LeaveTypeID != nil {
-		query += " AND r.leave_type_id = ?"
-		args = append(args, *params.LeaveTypeID)
-	}
-	if params.Year != nil {
-		query += " AND EXTRACT(YEAR FROM r.start_date) = ?"
-		args = append(args, *params.Year)
-	}
-	query += " ORDER BY r.created_at DESC"
+	` + baseQuery
+	
+	selectQuery += utils.BuildSortClause("leave_requests", params.SortBy, params.GetSortDir(), "r.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.LeaveRequestResponse
-	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.LeaveRequestResponse]{}, err
 	}
-	return res, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.LeaveRequestResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *leaveRepository) GetRequestByID(ctx context.Context, tx Transaction, id uint) (*dto.LeaveRequestResponse, error) {

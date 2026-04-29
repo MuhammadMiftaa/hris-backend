@@ -54,6 +54,7 @@ type AttendanceLogResponse struct {
 	PermissionRequestID   *uint      `json:"permission_request_id"`
 	LeaveRequestID        *uint      `json:"leave_request_id"`
 	BusinessTripRequestID *uint      `json:"business_trip_request_id"`
+	DepartmentName        *string    `json:"department_name"` // NEW
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             *time.Time `json:"updated_at"`
 	DeletedAt             *time.Time `json:"deleted_at"`
@@ -87,11 +88,14 @@ type ShiftDayContext struct {
 }
 
 type AttendanceListParams struct {
-	EmployeeID *uint   `query:"employee_id"`
-	StartDate  *string `query:"start_date"`
-	EndDate    *string `query:"end_date"`
-	Status     *string `query:"status"`
-	BranchID   *uint   `query:"branch_id"`
+	PaginationParams
+	EmployeeID   *uint   `query:"employee_id"`
+	DepartmentID *uint   `query:"department_id"`
+	StartDate    *string `query:"start_date"`
+	EndDate      *string `query:"end_date"`
+	Status       *string `query:"status"`
+	BranchID     *uint   `query:"branch_id"`
+	Search       *string `query:"search"` // search by employee_name, employee_number
 }
 
 type MutabaahSubmitRequest struct {
@@ -126,12 +130,14 @@ type MutabaahTodayResponse struct {
 }
 
 type MutabaahListParams struct {
+	PaginationParams
 	EmployeeID   *uint   `query:"employee_id"`
 	DepartmentID *uint   `query:"department_id"`
 	BranchID     *uint   `query:"branch_id"`
 	StartDate    *string `query:"start_date"`
 	EndDate      *string `query:"end_date"`
 	IsSubmitted  *bool   `query:"is_submitted"`
+	Search       *string `query:"search"`
 }
 
 type MutabaahDailyReport struct {

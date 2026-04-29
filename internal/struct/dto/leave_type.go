@@ -48,3 +48,8 @@ type LeaveTypeMetadata struct {
 	CategoryMeta     []Meta `json:"category_meta"`
 	DurationUnitMeta []Meta `json:"duration_unit_meta"`
 }
+
+type LeaveTypeListParams struct {
+	PaginationParams
+	Search *string `query:"search"`
+}

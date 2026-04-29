@@ -15,7 +15,7 @@ import (
 type ShiftService interface {
 	GetMetadata(ctx context.Context) (dto.ShiftMetadata, error)
 	// Template CRUD
-	GetAllTemplates(ctx context.Context) ([]dto.ShiftTemplateResponse, error)
+	GetAllTemplates(ctx context.Context, params dto.ShiftTemplateListParams) (dto.PaginatedResponse[dto.ShiftTemplateResponse], error)
 	GetTemplateByID(ctx context.Context, id uint) (dto.ShiftTemplateResponse, error)
 	CreateTemplate(ctx context.Context, req dto.CreateShiftRequest) (dto.ShiftTemplateResponse, error)
 	UpdateTemplate(ctx context.Context, id uint, req dto.UpdateShiftRequest) (dto.ShiftTemplateResponse, error)
@@ -23,7 +23,7 @@ type ShiftService interface {
 	// Detail
 	GetDetailsByTemplateID(ctx context.Context, shiftID uint) ([]dto.ShiftTemplateDetailResp, error)
 	// Schedule CRUD
-	GetAllSchedules(ctx context.Context, params *dto.ScheduleListParams) ([]dto.ScheduleResponse, error)
+	GetAllSchedules(ctx context.Context, params dto.ScheduleListParams) (dto.PaginatedResponse[dto.ScheduleResponse], error)
 	GetScheduleByID(ctx context.Context, id uint) (dto.ScheduleResponse, error)
 	CreateSchedule(ctx context.Context, req dto.CreateScheduleRequest) (dto.ScheduleResponse, error)
 	UpdateSchedule(ctx context.Context, id uint, req dto.UpdateScheduleRequest) (dto.ScheduleResponse, error)
@@ -49,10 +49,10 @@ func (s *shiftService) GetMetadata(ctx context.Context) (dto.ShiftMetadata, erro
 
 // ── Template ──────────────────────────────────────────
 
-func (s *shiftService) GetAllTemplates(ctx context.Context) ([]dto.ShiftTemplateResponse, error) {
-	templates, err := s.repo.GetAllShiftTemplates(ctx, nil)
+func (s *shiftService) GetAllTemplates(ctx context.Context, params dto.ShiftTemplateListParams) (dto.PaginatedResponse[dto.ShiftTemplateResponse], error) {
+	templates, err := s.repo.GetAllShiftTemplates(ctx, nil, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all shift templates: %w", err)
+		return dto.PaginatedResponse[dto.ShiftTemplateResponse]{}, fmt.Errorf("get all shift templates: %w", err)
 	}
 	return templates, nil
 }
@@ -182,10 +182,10 @@ func (s *shiftService) GetDetailsByTemplateID(ctx context.Context, shiftID uint)
 
 // ── Schedule ──────────────────────────────────────────
 
-func (s *shiftService) GetAllSchedules(ctx context.Context, params *dto.ScheduleListParams) ([]dto.ScheduleResponse, error) {
+func (s *shiftService) GetAllSchedules(ctx context.Context, params dto.ScheduleListParams) (dto.PaginatedResponse[dto.ScheduleResponse], error) {
 	schedules, err := s.repo.GetAllSchedules(ctx, nil, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all schedules: %w", err)
+		return dto.PaginatedResponse[dto.ScheduleResponse]{}, fmt.Errorf("get all schedules: %w", err)
 	}
 	return schedules, nil
 }

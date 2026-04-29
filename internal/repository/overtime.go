@@ -7,12 +7,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type OvertimeRepository interface {
-	GetAll(ctx context.Context, tx Transaction, params dto.OvertimeListParams) ([]dto.OvertimeRequestResponse, error)
+	GetAll(ctx context.Context, tx Transaction, params dto.OvertimeListParams) (dto.PaginatedResponse[dto.OvertimeRequestResponse], error)
 	GetByID(ctx context.Context, tx Transaction, id uint) (*dto.OvertimeRequestResponse, error)
 	Create(ctx context.Context, tx Transaction, m model.OvertimeRequest) (model.OvertimeRequest, error)
 	UpdateRequestStatus(ctx context.Context, tx Transaction, id uint, status string) error
@@ -42,17 +43,57 @@ func (r *overtimeRepository) getDB(ctx context.Context, tx Transaction) (*gorm.D
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params dto.OvertimeListParams) ([]dto.OvertimeRequestResponse, error) {
+func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params dto.OvertimeListParams) (dto.PaginatedResponse[dto.OvertimeRequestResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.OvertimeRequestResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM overtime_requests o
+		JOIN employees e ON e.id = o.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		WHERE o.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND o.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.Status != nil {
+		baseQuery += " AND o.status = ?"
+		args = append(args, *params.Status)
+	}
+	if params.StartDate != nil {
+		baseQuery += " AND o.overtime_date >= ?::DATE"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil {
+		baseQuery += " AND o.overtime_date <= ?::DATE"
+		args = append(args, *params.EndDate)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR o.reason ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.OvertimeRequestResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			o.id,
 			o.employee_id,
 			e.full_name AS employee_name,
+			d.name AS department_name,
 			o.overtime_date::TEXT,
 			o.planned_start AS planned_start,
 			o.planned_end AS planned_end,
@@ -62,35 +103,31 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 			o.status,
 			o.created_at,
 			o.updated_at
-		FROM overtime_requests o
-		JOIN employees e ON e.id = o.employee_id
-		WHERE o.deleted_at IS NULL
-	`
-	args := []interface{}{}
-
-	if params.EmployeeID != nil {
-		query += " AND o.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.Status != nil {
-		query += " AND o.status = ?"
-		args = append(args, *params.Status)
-	}
-	if params.StartDate != nil {
-		query += " AND o.overtime_date >= ?::DATE"
-		args = append(args, *params.StartDate)
-	}
-	if params.EndDate != nil {
-		query += " AND o.overtime_date <= ?::DATE"
-		args = append(args, *params.EndDate)
-	}
-	query += " ORDER BY o.created_at DESC"
+	` + baseQuery
+	
+	selectQuery += utils.BuildSortClause("overtime", params.SortBy, params.GetSortDir(), "o.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.OvertimeRequestResponse
-	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.OvertimeRequestResponse]{}, err
 	}
-	return res, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.OvertimeRequestResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *overtimeRepository) GetByID(ctx context.Context, tx Transaction, id uint) (*dto.OvertimeRequestResponse, error) {

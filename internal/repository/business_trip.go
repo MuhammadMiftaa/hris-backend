@@ -7,12 +7,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type BusinessTripRepository interface {
-	GetAll(ctx context.Context, tx Transaction, params dto.BusinessTripListParams) ([]dto.BusinessTripRequestResponse, error)
+	GetAll(ctx context.Context, tx Transaction, params dto.BusinessTripListParams) (dto.PaginatedResponse[dto.BusinessTripRequestResponse], error)
 	GetByID(ctx context.Context, tx Transaction, id uint) (*dto.BusinessTripRequestResponse, error)
 	Create(ctx context.Context, tx Transaction, m model.BusinessTripRequest) (model.BusinessTripRequest, error)
 	UpdateStatus(ctx context.Context, tx Transaction, id uint, status string, approverID uint, notes *string) error
@@ -38,17 +39,58 @@ func (r *businessTripRepository) getDB(ctx context.Context, tx Transaction) (*go
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *businessTripRepository) GetAll(ctx context.Context, tx Transaction, params dto.BusinessTripListParams) ([]dto.BusinessTripRequestResponse, error) {
+func (r *businessTripRepository) GetAll(ctx context.Context, tx Transaction, params dto.BusinessTripListParams) (dto.PaginatedResponse[dto.BusinessTripRequestResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.BusinessTripRequestResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM business_trip_requests b
+		JOIN employees e ON e.id = b.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		LEFT JOIN employees a ON a.id = b.approved_by
+		WHERE b.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND b.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.Status != nil {
+		baseQuery += " AND b.status = ?"
+		args = append(args, *params.Status)
+	}
+	if params.StartDate != nil {
+		baseQuery += " AND b.start_date >= ?::DATE"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil {
+		baseQuery += " AND b.end_date <= ?::DATE"
+		args = append(args, *params.EndDate)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.BusinessTripRequestResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			b.id,
 			b.employee_id,
 			e.full_name AS employee_name,
+			d.name AS department_name,
 			b.start_date::TEXT AS start_date,
 			b.end_date::TEXT AS end_date,
 			b.destination,
@@ -61,36 +103,31 @@ func (r *businessTripRepository) GetAll(ctx context.Context, tx Transaction, par
 			b.approver_notes,
 			b.created_at,
 			b.updated_at
-		FROM business_trip_requests b
-		JOIN employees e ON e.id = b.employee_id
-		LEFT JOIN employees a ON a.id = b.approved_by
-		WHERE b.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	` + baseQuery
 
-	if params.EmployeeID != nil {
-		query += " AND b.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.Status != nil {
-		query += " AND b.status = ?"
-		args = append(args, *params.Status)
-	}
-	if params.StartDate != nil {
-		query += " AND b.start_date >= ?::DATE"
-		args = append(args, *params.StartDate)
-	}
-	if params.EndDate != nil {
-		query += " AND b.end_date <= ?::DATE"
-		args = append(args, *params.EndDate)
-	}
-	query += " ORDER BY b.created_at DESC"
+	selectQuery += utils.BuildSortClause("business_trip", params.SortBy, params.GetSortDir(), "b.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.BusinessTripRequestResponse
-	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.BusinessTripRequestResponse]{}, err
 	}
-	return res, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.BusinessTripRequestResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *businessTripRepository) GetByID(ctx context.Context, tx Transaction, id uint) (*dto.BusinessTripRequestResponse, error) {

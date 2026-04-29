@@ -12,7 +12,7 @@ import (
 )
 
 type DailyReportService interface {
-	GetAll(ctx context.Context, params dto.DailyReportListParams) ([]dto.DailyReportResponse, error)
+	GetAll(ctx context.Context, params dto.DailyReportListParams) (dto.PaginatedResponse[dto.DailyReportResponse], error)
 	GetByID(ctx context.Context, id uint) (dto.DailyReportResponse, error)
 	Create(ctx context.Context, employeeID uint, req dto.CreateDailyReportRequest) (dto.DailyReportResponse, error)
 	Update(ctx context.Context, id uint, employeeID uint, req dto.UpdateDailyReportRequest) (dto.DailyReportResponse, error) // ADDED
@@ -27,7 +27,7 @@ func NewDailyReportService(repo repository.DailyReportRepository) DailyReportSer
 	return &dailyReportService{repo: repo}
 }
 
-func (s *dailyReportService) GetAll(ctx context.Context, params dto.DailyReportListParams) ([]dto.DailyReportResponse, error) {
+func (s *dailyReportService) GetAll(ctx context.Context, params dto.DailyReportListParams) (dto.PaginatedResponse[dto.DailyReportResponse], error) {
 	return s.repo.GetAll(ctx, nil, params)
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
@@ -15,7 +16,7 @@ type AttendanceRepository interface {
 	// Attendance log
 	GetTodayLog(ctx context.Context, tx Transaction, employeeID uint, date string) (*dto.AttendanceLogResponse, error)
 	GetLogByID(ctx context.Context, tx Transaction, id uint) (*dto.AttendanceLogResponse, error)
-	GetAllLogs(ctx context.Context, tx Transaction, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error)
+	GetAllLogs(ctx context.Context, tx Transaction, params dto.AttendanceListParams) (dto.PaginatedResponse[dto.AttendanceLogResponse], error)
 	CreateLog(ctx context.Context, tx Transaction, m model.AttendanceLog) (model.AttendanceLog, error)
 	UpdateLog(ctx context.Context, tx Transaction, id uint, updates map[string]interface{}) error
 
@@ -179,17 +180,63 @@ func (r *attendanceRepository) GetLogByID(ctx context.Context, tx Transaction, i
 	return &log, nil
 }
 
-func (r *attendanceRepository) GetAllLogs(ctx context.Context, tx Transaction, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error) {
+func (r *attendanceRepository) GetAllLogs(ctx context.Context, tx Transaction, params dto.AttendanceListParams) (dto.PaginatedResponse[dto.AttendanceLogResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.AttendanceLogResponse]{}, err
 	}
 
-	query := `
-		SELECT
+	baseQuery := `
+		FROM attendance_logs al
+		JOIN employees e ON e.id = al.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		LEFT JOIN employee_schedules es ON es.id = al.schedule_id AND es.deleted_at IS NULL
+		LEFT JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		WHERE al.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND al.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+	if params.StartDate != nil {
+		baseQuery += " AND al.attendance_date >= ?"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil {
+		baseQuery += " AND al.attendance_date <= ?"
+		args = append(args, *params.EndDate)
+	}
+	if params.Status != nil {
+		baseQuery += " AND al.status = ?"
+		args = append(args, *params.Status)
+	}
+	if params.BranchID != nil {
+		baseQuery += " AND e.branch_id = ?"
+		args = append(args, *params.BranchID)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.AttendanceLogResponse]{}, err
+	}
+
+	selectQuery := `SELECT
 			al.id,
 			al.employee_id,
 			e.full_name              AS employee_name,
+			e.employee_number        AS employee_number,
+			d.name                   AS department_name,
 			al.attendance_date::TEXT AS attendance_date,
 			al.schedule_id,
 			st.name                  AS shift_name,
@@ -213,37 +260,31 @@ func (r *attendanceRepository) GetAllLogs(ctx context.Context, tx Transaction, p
 			al.business_trip_request_id,
 			al.created_at,
 			al.updated_at
-		FROM attendance_logs al
-		JOIN employees e ON e.id = al.employee_id
-		LEFT JOIN employee_schedules es ON es.id = al.schedule_id AND es.deleted_at IS NULL
-		LEFT JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
-		WHERE al.deleted_at IS NULL
-	`
-	args := []interface{}{}
-
-	if params.EmployeeID != nil {
-		query += " AND al.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.StartDate != nil {
-		query += " AND al.attendance_date >= ?"
-		args = append(args, *params.StartDate)
-	}
-	if params.EndDate != nil {
-		query += " AND al.attendance_date <= ?"
-		args = append(args, *params.EndDate)
-	}
-	if params.Status != nil {
-		query += " AND al.status = ?"
-		args = append(args, *params.Status)
-	}
-	query += " ORDER BY al.attendance_date DESC"
+		` + baseQuery
+	
+	selectQuery += utils.BuildSortClause("attendance", params.SortBy, params.GetSortDir(), "al.attendance_date DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var logs []dto.AttendanceLogResponse
-	if err := db.Raw(query, args...).Scan(&logs).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&logs).Error; err != nil {
+		return dto.PaginatedResponse[dto.AttendanceLogResponse]{}, err
 	}
-	return logs, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.AttendanceLogResponse]{
+		Data: logs,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *attendanceRepository) CreateLog(ctx context.Context, tx Transaction, m model.AttendanceLog) (model.AttendanceLog, error) {

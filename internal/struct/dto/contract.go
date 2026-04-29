@@ -33,3 +33,8 @@ type UpdateContractRequest struct {
 	Salary         *float64 `json:"salary"`
 	Notes          *string  `json:"notes"`
 }
+
+type ContractListParams struct {
+	PaginationParams
+	Search *string `query:"search"`
+}

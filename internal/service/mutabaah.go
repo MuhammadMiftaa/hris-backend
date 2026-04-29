@@ -14,7 +14,7 @@ type MutabaahService interface {
 	GetTodayStatus(ctx context.Context, employeeID uint) (dto.MutabaahTodayResponse, error)
 	Submit(ctx context.Context, employeeID uint, isTrainer bool, req dto.MutabaahSubmitRequest) (dto.MutabaahLogResponse, error)
 	Cancel(ctx context.Context, employeeID uint, req dto.MutabaahCancelRequest) (dto.MutabaahLogResponse, error)
-	GetAllLogs(ctx context.Context, params dto.MutabaahListParams) ([]dto.MutabaahLogResponse, error)
+	GetAllLogs(ctx context.Context, params dto.MutabaahListParams) (dto.PaginatedResponse[dto.MutabaahLogResponse], error)
 	HRDCancel(ctx context.Context, id uint) (dto.MutabaahLogResponse, error)
 	GetDailyReport(ctx context.Context, date string) ([]dto.MutabaahDailyReport, error)
 	GetMonthlyReport(ctx context.Context, month, year int) ([]dto.MutabaahMonthlySummary, error)
@@ -184,7 +184,7 @@ func (s *mutabaahService) Cancel(ctx context.Context, employeeID uint, req dto.M
 	return *result, nil
 }
 
-func (s *mutabaahService) GetAllLogs(ctx context.Context, params dto.MutabaahListParams) ([]dto.MutabaahLogResponse, error) {
+func (s *mutabaahService) GetAllLogs(ctx context.Context, params dto.MutabaahListParams) (dto.PaginatedResponse[dto.MutabaahLogResponse], error) {
 	return s.repo.GetAllLogs(ctx, nil, params)
 }
 

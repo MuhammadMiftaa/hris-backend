@@ -30,8 +30,10 @@ type UpdateDailyReportRequest struct {
 }
 
 type DailyReportListParams struct {
+	PaginationParams
 	EmployeeID  *uint   `query:"employee_id"`
 	StartDate   *string `query:"start_date"`
 	EndDate     *string `query:"end_date"`
 	IsSubmitted *bool   `query:"is_submitted"`
+	Search      *string `query:"search"`
 }

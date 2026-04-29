@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"fmt"
+	"time"
+
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -275,4 +279,122 @@ func (h *AttendanceHandler) UpdateOverride(c *fiber.Ctx) error {
 		Message:    "attendance override updated",
 		Data:       res,
 	})
+}
+
+// Export — GET /attendance/export?format=csv|pdf
+func (h *AttendanceHandler) Export(c *fiber.Ctx) error {
+	var params dto.AttendanceListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	// Override pagination: ambil semua data yang match filter
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	account := getAccountFromCtx(c)
+	result, err := h.service.GetAllLogs(c.Context(), account.RoleLevel, params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		return h.exportCSV(c, result.Data)
+	case dto.ExportPDF:
+		return h.exportPDF(c, result.Data)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+func (h *AttendanceHandler) exportCSV(c *fiber.Ctx, logs []dto.AttendanceLogResponse) error {
+	headers := []string{"Tanggal", "Pegawai", "NIP", "Departemen", "Status",
+		"Jam Masuk", "Jam Keluar", "Keterlambatan (mnt)", "Metode"}
+	var rows [][]string
+	for _, l := range logs {
+		
+		empName := ""
+		if l.EmployeeName != "" {
+			empName = l.EmployeeName
+		}
+		deptName := "-"
+		if l.DepartmentName != nil {
+			deptName = *l.DepartmentName
+		}
+		
+		clockIn := "-"
+		if l.ClockInAt != nil {
+			clockIn = l.ClockInAt.Format("15:04")
+		}
+		clockOut := "-"
+		if l.ClockOutAt != nil {
+			clockOut = l.ClockOutAt.Format("15:04")
+		}
+		method := "-"
+		if l.ClockInMethod != nil {
+			method = *l.ClockInMethod
+		}
+
+		rows = append(rows, []string{
+			l.AttendanceDate, empName, l.EmployeeNumber,
+			deptName, l.Status,
+			clockIn, clockOut, fmt.Sprintf("%d", l.LateMinutes), method,
+		})
+	}
+	data, err := utils.WriteCSV(headers, rows)
+	if err != nil {
+		return respondError(c, err)
+	}
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename=presensi.csv")
+	return c.Send(data)
+}
+
+func (h *AttendanceHandler) exportPDF(c *fiber.Ctx, logs []dto.AttendanceLogResponse) error {
+	headers := []string{"Tanggal", "Pegawai", "Departemen", "Status",
+		"Masuk", "Keluar", "Terlambat"}
+	var rows [][]string
+	for _, l := range logs {
+		empName := ""
+		if l.EmployeeName != "" {
+			empName = l.EmployeeName
+		}
+		deptName := "-"
+		if l.DepartmentName != nil {
+			deptName = *l.DepartmentName
+		}
+		clockIn := "-"
+		if l.ClockInAt != nil {
+			clockIn = l.ClockInAt.Format("15:04")
+		}
+		clockOut := "-"
+		if l.ClockOutAt != nil {
+			clockOut = l.ClockOutAt.Format("15:04")
+		}
+
+		rows = append(rows, []string{
+			l.AttendanceDate, empName, deptName,
+			l.Status, clockIn, clockOut, fmt.Sprintf("%d mnt", l.LateMinutes),
+		})
+	}
+	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+		Title: "Laporan Presensi", Date: time.Now().Format("02 Jan 2006"),
+		Headers: headers, Rows: rows, TotalData: len(logs),
+	})
+	if err != nil {
+		return respondError(c, err)
+	}
+	pdf, err := utils.GeneratePDF(html)
+	if err != nil {
+		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename=presensi.pdf")
+	return c.Send(pdf)
 }

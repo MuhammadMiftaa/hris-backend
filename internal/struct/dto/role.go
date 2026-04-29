@@ -47,3 +47,8 @@ type RoleMetadata struct {
 	ActionMeta []Meta `json:"action_meta"`
 	LevelMeta  []Meta `json:"level_meta"`
 }
+
+type RoleListParams struct {
+	PaginationParams
+	Search *string `query:"search"`
+}

@@ -15,7 +15,7 @@ import (
 )
 
 type BusinessTripService interface {
-	GetAll(ctx context.Context, params dto.BusinessTripListParams) ([]dto.BusinessTripRequestResponse, error)
+	GetAll(ctx context.Context, params dto.BusinessTripListParams) (dto.PaginatedResponse[dto.BusinessTripRequestResponse], error)
 	GetByID(ctx context.Context, id uint) (dto.BusinessTripRequestResponse, error)
 	Create(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateBusinessTripRequest) (dto.BusinessTripRequestResponse, error)
 	UpdateStatus(ctx context.Context, employeeID uint, id uint, req dto.UpdateBusinessTripStatusRequest) (dto.BusinessTripRequestResponse, error)
@@ -43,20 +43,20 @@ func NewBusinessTripService(
 	}
 }
 
-func (s *businessTripService) GetAll(ctx context.Context, params dto.BusinessTripListParams) ([]dto.BusinessTripRequestResponse, error) {
+func (s *businessTripService) GetAll(ctx context.Context, params dto.BusinessTripListParams) (dto.PaginatedResponse[dto.BusinessTripRequestResponse], error) {
 	reqs, err := s.repo.GetAll(ctx, nil, params)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.BusinessTripRequestResponse]{}, err
 	}
-	for i := range reqs {
-		if reqs[i].DocumentURL != nil && *reqs[i].DocumentURL != "" && !strings.HasPrefix(*reqs[i].DocumentURL, "http") {
-			url, err := s.minio.PresignedGetObject(ctx, storage.BucketBusinessTripDocuments, *reqs[i].DocumentURL, storage.PresignedDownloadExpiry)
+	for i := range reqs.Data {
+		if reqs.Data[i].DocumentURL != nil && *reqs.Data[i].DocumentURL != "" && !strings.HasPrefix(*reqs.Data[i].DocumentURL, "http") {
+			url, err := s.minio.PresignedGetObject(ctx, storage.BucketBusinessTripDocuments, *reqs.Data[i].DocumentURL, storage.PresignedDownloadExpiry)
 			if err == nil {
-				reqs[i].DocumentURL = &url
+				reqs.Data[i].DocumentURL = &url
 			} else {
 				logger.Warn("presign business trip document failed", map[string]any{
-					"request_id": reqs[i].ID,
-					"key":        *reqs[i].DocumentURL,
+					"request_id": reqs.Data[i].ID,
+					"key":        *reqs.Data[i].DocumentURL,
 					"error":      err.Error(),
 				})
 			}

@@ -13,7 +13,7 @@ import (
 
 type PermissionRequestService interface {
 	GetMetadata(ctx context.Context) (dto.RequestMetadata, error)
-	GetAll(ctx context.Context, params dto.PermissionListParams) ([]dto.PermissionRequestResponse, error)
+	GetAll(ctx context.Context, params dto.PermissionListParams) (dto.PaginatedResponse[dto.PermissionRequestResponse], error)
 	GetByID(ctx context.Context, id uint) (dto.PermissionRequestResponse, error)
 	Create(ctx context.Context, employeeID uint, roleLevel string, req dto.CreatePermissionRequest) (dto.PermissionRequestResponse, error)
 	UpdateStatus(ctx context.Context, employeeID uint, id uint, req dto.UpdatePermissionStatusRequest) (dto.PermissionRequestResponse, error)
@@ -51,7 +51,7 @@ func (s *permissionRequestService) GetMetadata(ctx context.Context) (dto.Request
 	}, nil
 }
 
-func (s *permissionRequestService) GetAll(ctx context.Context, params dto.PermissionListParams) ([]dto.PermissionRequestResponse, error) {
+func (s *permissionRequestService) GetAll(ctx context.Context, params dto.PermissionListParams) (dto.PaginatedResponse[dto.PermissionRequestResponse], error) {
 	return s.repo.GetAll(ctx, nil, params)
 }
 

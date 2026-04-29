@@ -6,6 +6,7 @@ type LeaveBalanceResponse struct {
 	ID                   uint       `json:"id"`
 	EmployeeID           uint       `json:"employee_id"`
 	EmployeeName         *string    `json:"employee_name"`
+	DepartmentName       *string    `json:"department_name"`
 	LeaveTypeID          uint       `json:"leave_type_id"`
 	LeaveTypeName        *string    `json:"leave_type_name"`
 	Year                 int        `json:"year"`
@@ -25,6 +26,7 @@ type LeaveRequestResponse struct {
 	EmployeeName  *string                 `json:"employee_name"`
 	LeaveTypeID   uint                    `json:"leave_type_id"`
 	LeaveTypeName *string                 `json:"leave_type_name"`
+	DepartmentName *string                `json:"department_name"`
 	LeaveCategory *string                 `json:"leave_category"`
 	StartDate     string                  `json:"start_date"`
 	EndDate       string                  `json:"end_date"`
@@ -71,19 +73,27 @@ type RejectLeaveRequest struct {
 }
 
 type LeaveBalanceListParams struct {
-	EmployeeID *uint `query:"employee_id"`
-	Year       *int  `query:"year"`
+	PaginationParams
+	EmployeeID *uint   `query:"employee_id"`
+	Year       *int    `query:"year"`
+	Search     *string `query:"search"`
 }
 
 type LeaveRequestListParams struct {
-	EmployeeID  *uint   `query:"employee_id"`
-	Status      *string `query:"status"`
-	LeaveTypeID *uint   `query:"leave_type_id"`
-	Year        *int    `query:"year"`
+	PaginationParams
+	EmployeeID   *uint   `query:"employee_id"`
+	DepartmentID *uint   `query:"department_id"`
+	Status       *string `query:"status"`
+	LeaveTypeID  *uint   `query:"leave_type_id"`
+	Year         *int    `query:"year"`
+	Search       *string `query:"search"`
+	StartDate    *string `query:"start_date"`
+	EndDate      *string `query:"end_date"`
 }
 
 type LeaveMetadata struct {
-	LeaveTypeMeta []Meta `json:"leave_type_meta"`
-	StatusMeta    []Meta `json:"status_meta"`
-	EmployeeMeta  []Meta `json:"employee_meta"`
+	LeaveTypeMeta  []Meta `json:"leave_type_meta"`
+	StatusMeta     []Meta `json:"status_meta"`
+	EmployeeMeta   []Meta `json:"employee_meta"`
+	DepartmentMeta []Meta `json:"department_meta"`
 }

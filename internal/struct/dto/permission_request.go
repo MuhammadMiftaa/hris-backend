@@ -6,6 +6,7 @@ type PermissionRequestResponse struct {
 	ID             uint       `json:"id"`
 	EmployeeID     uint       `json:"employee_id"`
 	EmployeeName   *string    `json:"employee_name"`
+	DepartmentName *string    `json:"department_name"`
 	Date           string     `json:"date"`
 	PermissionType string     `json:"permission_type"`
 	LeaveTime      *string    `json:"leave_time"`
@@ -37,11 +38,14 @@ type UpdatePermissionStatusRequest struct {
 }
 
 type PermissionListParams struct {
+	PaginationParams
 	EmployeeID     *uint   `query:"employee_id"`
+	DepartmentID   *uint   `query:"department_id"`
 	Status         *string `query:"status"`
 	PermissionType *string `query:"permission_type"`
 	StartDate      *string `query:"start_date"`
 	EndDate        *string `query:"end_date"`
+	Search         *string `query:"search"`
 }
 
 type RequestMetadata struct {
@@ -49,4 +53,5 @@ type RequestMetadata struct {
 	WorkLocationMeta   []Meta `json:"work_location_meta"`
 	StatusMeta         []Meta `json:"status_meta"`
 	EmployeeMeta       []Meta `json:"employee_meta"`
+	DepartmentMeta     []Meta `json:"department_meta"`
 }

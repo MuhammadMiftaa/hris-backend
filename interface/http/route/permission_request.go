@@ -22,6 +22,7 @@ func PermissionRequestRoutes(app *fiber.App, db *gorm.DB) {
 	{
 		perms.Get("/metadata", h.Metadata)
 		perms.Get("/", middleware.RBACMiddleware(data.PERM_RequestRead), h.List)
+		perms.Get("/export", middleware.RBACMiddleware(data.PERM_RequestRead), h.Export)
 		perms.Get("/:id", middleware.RBACMiddleware(data.PERM_RequestRead), h.Detail)
 		perms.Post("/", middleware.RBACMiddleware(data.PERM_RequestCreate), h.Create)
 		perms.Put("/:id", middleware.RBACMiddleware(data.PERM_RequestUpdate), h.UpdateStatus)

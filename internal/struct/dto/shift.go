@@ -68,6 +68,11 @@ type ShiftMetadata struct {
 
 // ── Requests ───────────────────────────────────────────
 
+type ShiftTemplateListParams struct {
+	PaginationParams
+	Search *string `query:"search"`
+}
+
 type CreateShiftDetailRequest struct {
 	DayOfWeek       string  `json:"day_of_week"`
 	IsWorkingDay    bool    `json:"is_working_day"`
@@ -112,9 +117,11 @@ type UpdateScheduleRequest struct {
 }
 
 type ScheduleListParams struct {
-	EmployeeID      *uint
-	ShiftTemplateID *uint
-	IsActive        *bool
+	PaginationParams
+	EmployeeID      *uint   `query:"employee_id"`
+	ShiftTemplateID *uint   `query:"shift_template_id"`
+	IsActive        *bool   `query:"is_active"`
+	Search          *string `query:"search"`
 }
 
 // TodayScheduleResponse — response cek jadwal kerja hari ini untuk pegawai

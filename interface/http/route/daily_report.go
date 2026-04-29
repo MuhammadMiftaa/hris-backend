@@ -19,6 +19,7 @@ func DailyReportRoutes(app *fiber.App, db *gorm.DB) {
 	reports := app.Group("/daily-reports")
 	{
 		reports.Get("/", middleware.RBACMiddleware(data.PERM_DailyReportRead), h.List)
+		reports.Get("/export", middleware.RBACMiddleware(data.PERM_DailyReportRead), h.Export)
 		reports.Get("/:id", middleware.RBACMiddleware(data.PERM_DailyReportRead), h.Detail)
 		reports.Post("/", middleware.RBACMiddleware(data.PERM_DailyReportCreate), h.Create)
 		reports.Put("/:id", middleware.RBACMiddleware(data.PERM_DailyReportCreate), h.Update)

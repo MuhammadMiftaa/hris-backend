@@ -6,12 +6,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type BranchRepository interface {
-	GetAllBranches(ctx context.Context) ([]dto.BranchResponse, error)
+	GetAllBranches(ctx context.Context, params dto.BranchListParams) (dto.PaginatedResponse[dto.BranchResponse], error)
 	GetBranchByID(ctx context.Context, id string) (dto.BranchResponse, error)
 	CreateBranch(ctx context.Context, req model.Branch) (model.Branch, error)
 	UpdateBranch(ctx context.Context, id string, req model.Branch) (model.Branch, error)
@@ -26,19 +27,55 @@ func NewBranchRepository(db *gorm.DB) BranchRepository {
 	return &branchRepository{db: db}
 }
 
-func (r *branchRepository) GetAllBranches(ctx context.Context) ([]dto.BranchResponse, error) {
-	var branches []dto.BranchResponse
-	if err := r.db.WithContext(ctx).Raw(`
+func (r *branchRepository) GetAllBranches(ctx context.Context, params dto.BranchListParams) (dto.PaginatedResponse[dto.BranchResponse], error) {
+	db := r.db.WithContext(ctx)
+
+	baseQuery := `
+		FROM branches
+		WHERE deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (name ILIKE ? OR code ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.BranchResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			id, code, name, address, latitude, longitude,
 			radius_meters, allow_wfh, created_at, updated_at
-		FROM branches
-		WHERE deleted_at IS NULL
-		ORDER BY name ASC
-	`).Scan(&branches).Error; err != nil {
-		return nil, err
+	` + baseQuery
+
+	selectQuery += utils.BuildSortClause("branches", params.SortBy, params.GetSortDir(), "name ASC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var branches []dto.BranchResponse
+	if err := db.Raw(selectQuery, args...).Scan(&branches).Error; err != nil {
+		return dto.PaginatedResponse[dto.BranchResponse]{}, err
 	}
-	return branches, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.BranchResponse]{
+		Data: branches,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *branchRepository) GetBranchByID(ctx context.Context, id string) (dto.BranchResponse, error) {

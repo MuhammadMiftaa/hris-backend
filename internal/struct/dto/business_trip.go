@@ -6,6 +6,7 @@ type BusinessTripRequestResponse struct {
 	ID            uint       `json:"id"`
 	EmployeeID    uint       `json:"employee_id"`
 	EmployeeName  *string    `json:"employee_name"`
+	DepartmentName *string   `json:"department_name"`
 	StartDate     string     `json:"start_date"`
 	EndDate       string     `json:"end_date"`
 	TotalDays     int        `json:"total_days"`
@@ -37,8 +38,11 @@ type UpdateBusinessTripStatusRequest struct {
 }
 
 type BusinessTripListParams struct {
+	PaginationParams
 	EmployeeID *uint   `query:"employee_id"`
+	DepartmentID *uint `query:"department_id"`
 	Status     *string `query:"status"`
 	StartDate  *string `query:"start_date"`
 	EndDate    *string `query:"end_date"`
+	Search     *string `query:"search"`
 }

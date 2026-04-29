@@ -12,7 +12,7 @@ import (
 
 type RoleService interface {
 	GetMetadata(ctx context.Context) dto.RoleMetadata
-	GetAllRoles(ctx context.Context) ([]dto.RoleResponse, error)
+	GetAllRoles(ctx context.Context, params dto.RoleListParams) (dto.PaginatedResponse[dto.RoleResponse], error)
 	GetRoleByID(ctx context.Context, id string) (dto.RoleDetailResponse, error)
 	CreateRole(ctx context.Context, req dto.CreateRoleRequest) (dto.RoleResponse, error)
 	UpdateRole(ctx context.Context, id string, req dto.UpdateRoleRequest) (dto.RoleResponse, error)
@@ -38,10 +38,10 @@ func (s *roleService) GetMetadata(ctx context.Context) dto.RoleMetadata {
 	}
 }
 
-func (s *roleService) GetAllRoles(ctx context.Context) ([]dto.RoleResponse, error) {
-	roles, err := s.repo.GetAllRoles(ctx)
+func (s *roleService) GetAllRoles(ctx context.Context, params dto.RoleListParams) (dto.PaginatedResponse[dto.RoleResponse], error) {
+	roles, err := s.repo.GetAllRoles(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all roles: %w", err)
+		return dto.PaginatedResponse[dto.RoleResponse]{}, fmt.Errorf("get all roles: %w", err)
 	}
 	return roles, nil
 }

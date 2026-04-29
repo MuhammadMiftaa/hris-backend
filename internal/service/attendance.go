@@ -19,7 +19,7 @@ type AttendanceService interface {
 	GetTodayStatus(ctx context.Context, employeeID uint) (dto.AttendanceTodayResponse, error)
 	ClockIn(ctx context.Context, employeeID uint, req dto.ClockInRequest) (dto.AttendanceLogResponse, error)
 	ClockOut(ctx context.Context, employeeID uint, req dto.ClockOutRequest) (dto.AttendanceLogResponse, error)
-	GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error)
+	GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) (dto.PaginatedResponse[dto.AttendanceLogResponse], error)
 	GetMetadata(ctx context.Context) (dto.AttendanceMetadata, error)
 	CreateManualAttendance(ctx context.Context, employeeID uint, req dto.CreateManualAttendanceRequest) (dto.AttendanceLogResponse, error)
 	GetAllOverrides(ctx context.Context, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error)
@@ -496,20 +496,20 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 	return *resp, nil
 }
 
-func (s *attendanceService) GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) ([]dto.AttendanceLogResponse, error) {
+func (s *attendanceService) GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) (dto.PaginatedResponse[dto.AttendanceLogResponse], error) {
 	logs, err := s.repo.GetAllLogs(ctx, nil, params)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.AttendanceLogResponse]{}, err
 	}
 
 	// Resolve presigned URLs for photo fields
-	for i := range logs {
+	for i := range logs.Data {
 		if roleLevel == string(model.RoleLevelAdmin) || roleLevel == string(model.RoleLevelSuperAdmin) {
-			logs[i].ClockInPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockInPhotoURL)
-			logs[i].ClockOutPhotoURL = s.resolveAttendancePhotoURL(ctx, logs[i].ClockOutPhotoURL)
+			logs.Data[i].ClockInPhotoURL = s.resolveAttendancePhotoURL(ctx, logs.Data[i].ClockInPhotoURL)
+			logs.Data[i].ClockOutPhotoURL = s.resolveAttendancePhotoURL(ctx, logs.Data[i].ClockOutPhotoURL)
 		} else {
-			logs[i].ClockInPhotoURL = nil
-			logs[i].ClockOutPhotoURL = nil
+			logs.Data[i].ClockInPhotoURL = nil
+			logs.Data[i].ClockOutPhotoURL = nil
 		}
 	}
 

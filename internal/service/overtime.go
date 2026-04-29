@@ -12,7 +12,7 @@ import (
 )
 
 type OvertimeService interface {
-	GetAll(ctx context.Context, params dto.OvertimeListParams) ([]dto.OvertimeRequestResponse, error)
+	GetAll(ctx context.Context, params dto.OvertimeListParams) (dto.PaginatedResponse[dto.OvertimeRequestResponse], error)
 	GetByID(ctx context.Context, id uint) (dto.OvertimeRequestResponse, error)
 	Create(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateOvertimeRequest) (dto.OvertimeRequestResponse, error)
 	ApproveRequest(ctx context.Context, approverID uint, requestID uint, req dto.ApproveOvertimeRequest) (dto.OvertimeRequestResponse, error)
@@ -38,7 +38,7 @@ func NewOvertimeService(
 	}
 }
 
-func (s *overtimeService) GetAll(ctx context.Context, params dto.OvertimeListParams) ([]dto.OvertimeRequestResponse, error) {
+func (s *overtimeService) GetAll(ctx context.Context, params dto.OvertimeListParams) (dto.PaginatedResponse[dto.OvertimeRequestResponse], error) {
 	return s.repo.GetAll(ctx, nil, params)
 }
 

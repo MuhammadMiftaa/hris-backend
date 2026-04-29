@@ -46,9 +46,11 @@ type UpdateHolidayRequest struct {
 // ── List Params ────────────────────────────────────────
 
 type HolidayListParams struct {
-	Year     *int
-	Type     *string
-	BranchID *uint
+	PaginationParams
+	Year     *int    `query:"year"`
+	Type     *string `query:"type"`
+	BranchID *uint   `query:"branch_id"`
+	Search   *string `query:"search"`
 }
 
 // ── External API ───────────────────────────────────────

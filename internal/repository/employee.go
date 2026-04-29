@@ -7,6 +7,7 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
@@ -17,7 +18,7 @@ type EmployeeRepository interface {
 	GetRoleMetadata(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetJobPositionMetadata(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 
-	GetAllEmployees(ctx context.Context, tx Transaction) ([]dto.Employee, error)
+	GetAllEmployees(ctx context.Context, tx Transaction, params dto.EmployeeListParams) (dto.PaginatedResponse[dto.Employee], error)
 	GetEmployeeByID(ctx context.Context, tx Transaction, employeeID string) (dto.Employee, error)
 	CreateEmployee(ctx context.Context, tx Transaction, req model.Employee) (model.Employee, error)
 	UpdateEmployee(ctx context.Context, tx Transaction, id string, req model.Employee) (model.Employee, error)
@@ -152,14 +153,47 @@ func (r *employeeRepository) GetJobPositionMetadata(ctx context.Context, tx Tran
 }
 
 // ~ Employee
-func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction) ([]dto.Employee, error) {
+func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction, params dto.EmployeeListParams) (dto.PaginatedResponse[dto.Employee], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.Employee]{}, err
 	}
 
-	var employees []dto.Employee
-	if err := db.Raw(`
+	baseQuery := `
+		FROM employees e
+		LEFT JOIN accounts      a  ON a.employee_id = e.id  AND a.deleted_at IS NULL
+		LEFT JOIN branches      b  ON b.id = e.branch_id    AND b.deleted_at IS NULL
+		LEFT JOIN departments   d  ON d.id = e.department_id AND d.deleted_at IS NULL
+		LEFT JOIN roles         r  ON r.id = a.role_id       AND r.deleted_at IS NULL
+		LEFT JOIN job_positions jp ON jp.id = e.job_positions_id AND jp.deleted_at IS NULL
+		WHERE e.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.BranchID != nil {
+		baseQuery += " AND e.branch_id = ?"
+		args = append(args, *params.BranchID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.IsActive != nil {
+		baseQuery += " AND a.is_active = ?"
+		args = append(args, *params.IsActive)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.Employee]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			e.id,
 			e.employee_number,
@@ -175,7 +209,7 @@ func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction
 			e.blood_type,
 			e.nationality,
 			e.photo_url,
-			a.is_active,
+			COALESCE(a.is_active, FALSE) AS is_active,
 			e.is_trainer,
 			e.branch_id,
 			e.department_id,
@@ -188,17 +222,31 @@ func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction
 			d.name                     AS department_name,
 			r.name                     AS role_name,
 			jp.title                   AS job_position_title
-		FROM employees e
-		LEFT JOIN accounts      a  ON a.employee_id = e.id  AND a.deleted_at IS NULL
-		LEFT JOIN branches      b  ON b.id = e.branch_id    AND b.deleted_at IS NULL
-		LEFT JOIN departments   d  ON d.id = e.department_id AND d.deleted_at IS NULL
-		LEFT JOIN roles         r  ON r.id = a.role_id       AND r.deleted_at IS NULL
-		LEFT JOIN job_positions jp ON jp.id = e.job_positions_id AND jp.deleted_at IS NULL
-		WHERE e.deleted_at IS NULL
-	`).Scan(&employees).Error; err != nil {
-		return nil, err
+	` + baseQuery
+
+	selectQuery += utils.BuildSortClause("employee", params.SortBy, params.GetSortDir(), "e.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var employees []dto.Employee
+	if err := db.Raw(selectQuery, args...).Scan(&employees).Error; err != nil {
+		return dto.PaginatedResponse[dto.Employee]{}, err
 	}
-	return employees, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.Employee]{
+		Data: employees,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *employeeRepository) GetEmployeeByID(ctx context.Context, tx Transaction, employeeID string) (dto.Employee, error) {

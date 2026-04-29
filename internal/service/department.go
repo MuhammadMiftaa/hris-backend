@@ -11,7 +11,7 @@ import (
 
 type DepartmentService interface {
 	GetMetadata(ctx context.Context) (dto.DepartmentMetadata, error)
-	GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) ([]dto.DepartmentResponse, error)
+	GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) (dto.PaginatedResponse[dto.DepartmentResponse], error)
 	GetDepartmentByID(ctx context.Context, id string) (dto.DepartmentResponse, error)
 	CreateDepartment(ctx context.Context, req dto.CreateDepartmentRequest) (dto.DepartmentResponse, error)
 	UpdateDepartment(ctx context.Context, id string, req dto.UpdateDepartmentRequest) (dto.DepartmentResponse, error)
@@ -34,10 +34,10 @@ func (s *departmentService) GetMetadata(ctx context.Context) (dto.DepartmentMeta
 	return dto.DepartmentMetadata{BranchMeta: branchMeta}, nil
 }
 
-func (s *departmentService) GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) ([]dto.DepartmentResponse, error) {
+func (s *departmentService) GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) (dto.PaginatedResponse[dto.DepartmentResponse], error) {
 	departments, err := s.repo.GetAllDepartments(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all departments: %w", err)
+		return dto.PaginatedResponse[dto.DepartmentResponse]{}, fmt.Errorf("get all departments: %w", err)
 	}
 	return departments, nil
 }

@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"fmt"
+	"time"
+
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -89,6 +93,92 @@ func (h *MutabaahHandler) List(c *fiber.Ctx) error {
 		Message:    "mutabaah list",
 		Data:       result,
 	})
+}
+
+func (h *MutabaahHandler) Export(c *fiber.Ctx) error {
+	var params dto.MutabaahListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	result, err := h.service.GetAllLogs(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		return h.exportCSV(c, result.Data)
+	case dto.ExportPDF:
+		return h.exportPDF(c, result.Data)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+func (h *MutabaahHandler) exportCSV(c *fiber.Ctx, logs []dto.MutabaahLogResponse) error {
+	headers := []string{"Tanggal", "Pegawai", "Target Halaman", "Status Submit", "Waktu Submit"}
+	var rows [][]string
+	for _, m := range logs {
+		status := "Belum"
+		if m.IsSubmitted {
+			status = "Sudah"
+		}
+		submittedAt := "-"
+		if m.SubmittedAt != nil {
+			submittedAt = m.SubmittedAt.Format("15:04")
+		}
+		rows = append(rows, []string{
+			m.LogDate, m.EmployeeName, fmt.Sprintf("%d", m.TargetPages), status, submittedAt,
+		})
+	}
+	data, err := utils.WriteCSV(headers, rows)
+	if err != nil {
+		return respondError(c, err)
+	}
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename=mutabaah.csv")
+	return c.Send(data)
+}
+
+func (h *MutabaahHandler) exportPDF(c *fiber.Ctx, logs []dto.MutabaahLogResponse) error {
+	headers := []string{"Tanggal", "Pegawai", "Target", "Status", "Waktu"}
+	var rows [][]string
+	for _, m := range logs {
+		status := "Belum"
+		if m.IsSubmitted {
+			status = "Sudah"
+		}
+		submittedAt := "-"
+		if m.SubmittedAt != nil {
+			submittedAt = m.SubmittedAt.Format("15:04")
+		}
+		rows = append(rows, []string{
+			m.LogDate, m.EmployeeName, fmt.Sprintf("%d", m.TargetPages), status, submittedAt,
+		})
+	}
+	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+		Title: "Daftar Mutabaah (Tahsin/Tahfidz)", Date: time.Now().Format("02 Jan 2006"),
+		Headers: headers, Rows: rows, TotalData: len(logs),
+	})
+	if err != nil {
+		return respondError(c, err)
+	}
+	pdf, err := utils.GeneratePDF(html)
+	if err != nil {
+		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename=mutabaah.pdf")
+	return c.Send(pdf)
 }
 
 // HRDCancel — PUT /mutabaah/:id/cancel

@@ -6,12 +6,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type RoleRepository interface {
-	GetAllRoles(ctx context.Context) ([]dto.RoleResponse, error)
+	GetAllRoles(ctx context.Context, params dto.RoleListParams) (dto.PaginatedResponse[dto.RoleResponse], error)
 	GetRoleByID(ctx context.Context, id string) (dto.RoleDetailResponse, error)
 	CreateRole(ctx context.Context, req model.Role) (model.Role, error)
 	UpdateRole(ctx context.Context, id string, req model.Role) (model.Role, error)
@@ -41,22 +42,57 @@ func (r *roleRepository) getDB(ctx context.Context, tx Transaction) (*gorm.DB, e
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *roleRepository) GetAllRoles(ctx context.Context) ([]dto.RoleResponse, error) {
-	var roles []dto.RoleResponse
-	if err := r.db.WithContext(ctx).Raw(`
+func (r *roleRepository) GetAllRoles(ctx context.Context, params dto.RoleListParams) (dto.PaginatedResponse[dto.RoleResponse], error) {
+	db := r.db.WithContext(ctx)
+
+	baseQuery := `
+		FROM roles r
+		LEFT JOIN role_permissions rp ON rp.role_id = r.id
+		WHERE r.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND r.name ILIKE ?"
+		args = append(args, "%"+*params.Search+"%")
+	}
+
+	var total int
+	// We count distinct roles since we are doing a LEFT JOIN with permissions
+	if err := db.Raw("SELECT COUNT(DISTINCT r.id) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.RoleResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			r.id, r.name, r.level, r.description,
 			COUNT(rp.id) AS permission_count,
 			r.created_at, r.updated_at
-		FROM roles r
-		LEFT JOIN role_permissions rp ON rp.role_id = r.id
-		WHERE r.deleted_at IS NULL
-		GROUP BY r.id
-		ORDER BY r.name ASC
-	`).Scan(&roles).Error; err != nil {
-		return nil, err
+	` + baseQuery + ` GROUP BY r.id`
+
+	selectQuery += utils.BuildSortClause("roles", params.SortBy, params.GetSortDir(), "r.name ASC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var roles []dto.RoleResponse
+	if err := db.Raw(selectQuery, args...).Scan(&roles).Error; err != nil {
+		return dto.PaginatedResponse[dto.RoleResponse]{}, err
 	}
-	return roles, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.RoleResponse]{
+		Data: roles,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *roleRepository) GetRoleByID(ctx context.Context, id string) (dto.RoleDetailResponse, error) {

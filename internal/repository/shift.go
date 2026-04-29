@@ -7,13 +7,14 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type ShiftRepository interface {
 	// Template
-	GetAllShiftTemplates(ctx context.Context, tx Transaction) ([]dto.ShiftTemplateResponse, error)
+	GetAllShiftTemplates(ctx context.Context, tx Transaction, params dto.ShiftTemplateListParams) (dto.PaginatedResponse[dto.ShiftTemplateResponse], error)
 	GetShiftTemplateByID(ctx context.Context, tx Transaction, id uint) (dto.ShiftTemplateResponse, error)
 	CreateShiftTemplate(ctx context.Context, tx Transaction, m model.ShiftTemplate) (model.ShiftTemplate, error)
 	UpdateShiftTemplate(ctx context.Context, tx Transaction, id uint, m model.ShiftTemplate) (model.ShiftTemplate, error)
@@ -25,7 +26,7 @@ type ShiftRepository interface {
 	CreateDetails(ctx context.Context, tx Transaction, details []model.ShiftTemplateDetail) error
 
 	// Schedule
-	GetAllSchedules(ctx context.Context, tx Transaction, params *dto.ScheduleListParams) ([]dto.ScheduleResponse, error)
+	GetAllSchedules(ctx context.Context, tx Transaction, params dto.ScheduleListParams) (dto.PaginatedResponse[dto.ScheduleResponse], error)
 	GetScheduleByID(ctx context.Context, tx Transaction, id uint) (dto.ScheduleResponse, error)
 	CreateSchedule(ctx context.Context, tx Transaction, m model.EmployeeSchedule) (model.EmployeeSchedule, error)
 	UpdateSchedule(ctx context.Context, tx Transaction, id uint, m model.EmployeeSchedule) (model.EmployeeSchedule, error)
@@ -59,27 +60,45 @@ func (r *shiftRepository) getDB(ctx context.Context, tx Transaction) (*gorm.DB, 
 
 // ── Template ──────────────────────────────────────────
 
-func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transaction) ([]dto.ShiftTemplateResponse, error) {
+func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transaction, params dto.ShiftTemplateListParams) (dto.PaginatedResponse[dto.ShiftTemplateResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.ShiftTemplateResponse]{}, err
 	}
 
-	var rows []dto.ShiftTemplateRow
-	if err := db.Raw(`
-		SELECT id, name, is_flexible, can_wfa, created_at, updated_at, deleted_at
+	baseQuery := `
 		FROM shift_templates
 		WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
-	`).Scan(&rows).Error; err != nil {
-		return nil, err
+	`
+	args := []interface{}{}
+
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND name ILIKE ?"
+		args = append(args, "%"+*params.Search+"%")
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.ShiftTemplateResponse]{}, err
+	}
+
+	selectQuery := `
+		SELECT id, name, is_flexible, can_wfa, created_at, updated_at, deleted_at
+	` + baseQuery
+
+	selectQuery += utils.BuildSortClause("shift_templates", params.SortBy, params.GetSortDir(), "created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var rows []dto.ShiftTemplateRow
+	if err := db.Raw(selectQuery, args...).Scan(&rows).Error; err != nil {
+		return dto.PaginatedResponse[dto.ShiftTemplateResponse]{}, err
 	}
 
 	result := make([]dto.ShiftTemplateResponse, 0, len(rows))
 	for _, row := range rows {
 		details, err := r.GetDetailsByTemplateID(ctx, tx, row.ID)
 		if err != nil {
-			return nil, fmt.Errorf("get details for template %d: %w", row.ID, err)
+			return dto.PaginatedResponse[dto.ShiftTemplateResponse]{}, fmt.Errorf("get details for template %d: %w", row.ID, err)
 		}
 		result = append(result, dto.ShiftTemplateResponse{
 			ID:         row.ID,
@@ -93,7 +112,21 @@ func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transacti
 		})
 	}
 
-	return result, nil
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.ShiftTemplateResponse]{
+		Data: result,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *shiftRepository) GetShiftTemplateByID(ctx context.Context, tx Transaction, id uint) (dto.ShiftTemplateResponse, error) {
@@ -241,13 +274,44 @@ func (r *shiftRepository) CreateDetails(ctx context.Context, tx Transaction, det
 
 // ── Schedule ──────────────────────────────────────────
 
-func (r *shiftRepository) GetAllSchedules(ctx context.Context, tx Transaction, params *dto.ScheduleListParams) ([]dto.ScheduleResponse, error) {
+func (r *shiftRepository) GetAllSchedules(ctx context.Context, tx Transaction, params dto.ScheduleListParams) (dto.PaginatedResponse[dto.ScheduleResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.ScheduleResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM employee_schedules es
+		LEFT JOIN employees       e  ON e.id  = es.employee_id       AND e.deleted_at IS NULL
+		LEFT JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		WHERE es.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND es.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.ShiftTemplateID != nil {
+		baseQuery += " AND es.shift_template_id = ?"
+		args = append(args, *params.ShiftTemplateID)
+	}
+	if params.IsActive != nil {
+		baseQuery += " AND es.is_active = ?"
+		args = append(args, *params.IsActive)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ? OR st.name ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.ScheduleResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			es.id,
 			es.employee_id,
@@ -259,34 +323,31 @@ func (r *shiftRepository) GetAllSchedules(ctx context.Context, tx Transaction, p
 			es.end_date::TEXT  AS end_date,
 			es.is_active,
 			es.created_at, es.updated_at, es.deleted_at
-		FROM employee_schedules es
-		LEFT JOIN employees       e  ON e.id  = es.employee_id       AND e.deleted_at IS NULL
-		LEFT JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
-		WHERE es.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	` + baseQuery
 
-	if params != nil {
-		if params.EmployeeID != nil {
-			query += " AND es.employee_id = ?"
-			args = append(args, *params.EmployeeID)
-		}
-		if params.ShiftTemplateID != nil {
-			query += " AND es.shift_template_id = ?"
-			args = append(args, *params.ShiftTemplateID)
-		}
-		if params.IsActive != nil {
-			query += " AND es.is_active = ?"
-			args = append(args, *params.IsActive)
-		}
-	}
-	query += " ORDER BY es.effective_date DESC"
+	selectQuery += utils.BuildSortClause("employee_schedules", params.SortBy, params.GetSortDir(), "es.effective_date DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var schedules []dto.ScheduleResponse
-	if err := db.Raw(query, args...).Scan(&schedules).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&schedules).Error; err != nil {
+		return dto.PaginatedResponse[dto.ScheduleResponse]{}, err
 	}
-	return schedules, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.ScheduleResponse]{
+		Data: schedules,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *shiftRepository) GetScheduleByID(ctx context.Context, tx Transaction, id uint) (dto.ScheduleResponse, error) {

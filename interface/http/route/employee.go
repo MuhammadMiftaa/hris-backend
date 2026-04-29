@@ -21,6 +21,7 @@ func EmployeeRoutes(app *fiber.App, db *gorm.DB, minioClient storage.MinioClient
 	{
 		employees.Get("/metadata", h.Metadata)
 		employees.Get("/", middleware.RBACMiddleware(data.PERM_EmployeeRead), h.List)
+		employees.Get("/export", middleware.RBACMiddleware(data.PERM_EmployeeRead), h.Export)
 		employees.Get("/:id", middleware.RBACMiddleware(data.PERM_EmployeeRead), h.Detail)
 		employees.Post("/", middleware.RBACMiddleware(data.PERM_EmployeeCreate), h.Create)
 		employees.Put("/:id", middleware.RBACMiddleware(data.PERM_EmployeeUpdate), h.Update)

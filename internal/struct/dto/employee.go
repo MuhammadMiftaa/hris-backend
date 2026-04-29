@@ -67,6 +67,7 @@ type UpdateEmployeeRequest struct {
 }
 
 type EmployeeListParams struct {
+	PaginationParams
 	BranchID     *uint   `query:"branch_id"`
 	DepartmentID *uint   `query:"department_id"`
 	IsActive     *bool   `query:"is_active"`

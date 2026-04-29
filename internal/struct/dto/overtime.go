@@ -6,6 +6,7 @@ type OvertimeRequestResponse struct {
 	ID               uint       `json:"id"`
 	EmployeeID       uint       `json:"employee_id"`
 	EmployeeName     *string    `json:"employee_name"`
+	DepartmentName   *string    `json:"department_name"`
 	AttendanceLogID  *uint      `json:"attendance_log_id"`
 	OvertimeDate     string     `json:"overtime_date"`
 	PlannedStart     *time.Time `json:"planned_start"`
@@ -55,8 +56,11 @@ type RejectOvertimeRequest struct {
 }
 
 type OvertimeListParams struct {
+	PaginationParams
 	EmployeeID *uint   `query:"employee_id"`
+	DepartmentID *uint `query:"department_id"`
 	Status     *string `query:"status"`
 	StartDate  *string `query:"start_date"`
 	EndDate    *string `query:"end_date"`
+	Search     *string `query:"search"`
 }

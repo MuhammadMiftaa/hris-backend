@@ -7,12 +7,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type PermissionRequestRepository interface {
-	GetAll(ctx context.Context, tx Transaction, params dto.PermissionListParams) ([]dto.PermissionRequestResponse, error)
+	GetAll(ctx context.Context, tx Transaction, params dto.PermissionListParams) (dto.PaginatedResponse[dto.PermissionRequestResponse], error)
 	GetByID(ctx context.Context, tx Transaction, id uint) (*dto.PermissionRequestResponse, error)
 	Create(ctx context.Context, tx Transaction, m model.PermissionRequest) (model.PermissionRequest, error)
 	UpdateStatus(ctx context.Context, tx Transaction, id uint, status string, approverID uint, notes *string) error
@@ -41,17 +42,58 @@ func (r *permissionRequestRepository) getDB(ctx context.Context, tx Transaction)
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *permissionRequestRepository) GetAll(ctx context.Context, tx Transaction, params dto.PermissionListParams) ([]dto.PermissionRequestResponse, error) {
+func (r *permissionRequestRepository) GetAll(ctx context.Context, tx Transaction, params dto.PermissionListParams) (dto.PaginatedResponse[dto.PermissionRequestResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.PermissionRequestResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM permission_requests pr
+		JOIN employees e ON e.id = pr.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		LEFT JOIN employees a ON a.id = pr.approved_by
+		WHERE pr.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND pr.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.Status != nil {
+		baseQuery += " AND pr.status = ?"
+		args = append(args, *params.Status)
+	}
+	if params.StartDate != nil {
+		baseQuery += " AND pr.date >= ?::DATE"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil {
+		baseQuery += " AND pr.date <= ?::DATE"
+		args = append(args, *params.EndDate)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.PermissionRequestResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			pr.id,
 			pr.employee_id,
 			e.full_name AS employee_name,
+			d.name AS department_name,
 			pr.date::TEXT AS date,
 			pr.permission_type,
 			pr.leave_time::TEXT,
@@ -65,36 +107,31 @@ func (r *permissionRequestRepository) GetAll(ctx context.Context, tx Transaction
 			pr.approver_notes,
 			pr.created_at,
 			pr.updated_at
-		FROM permission_requests pr
-		JOIN employees e ON e.id = pr.employee_id
-		LEFT JOIN employees a ON a.id = pr.approved_by
-		WHERE pr.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	` + baseQuery
 
-	if params.EmployeeID != nil {
-		query += " AND pr.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.Status != nil {
-		query += " AND pr.status = ?"
-		args = append(args, *params.Status)
-	}
-	if params.StartDate != nil {
-		query += " AND pr.date >= ?::DATE"
-		args = append(args, *params.StartDate)
-	}
-	if params.EndDate != nil {
-		query += " AND pr.date <= ?::DATE"
-		args = append(args, *params.EndDate)
-	}
-	query += " ORDER BY pr.created_at DESC"
+	selectQuery += utils.BuildSortClause("permission", params.SortBy, params.GetSortDir(), "pr.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.PermissionRequestResponse
-	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.PermissionRequestResponse]{}, err
 	}
-	return res, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.PermissionRequestResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *permissionRequestRepository) GetByID(ctx context.Context, tx Transaction, id uint) (*dto.PermissionRequestResponse, error) {

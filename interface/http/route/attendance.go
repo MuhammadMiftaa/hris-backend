@@ -37,6 +37,9 @@ func AttendanceRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 		// Admin: daftar semua presensi
 		attendance.Get("/", middleware.RBACMiddleware(data.PERM_AttendanceRead), h.List)
 
+		// Admin: export presensi
+		attendance.Get("/export", middleware.RBACMiddleware(data.PERM_AttendanceRead), h.Export)
+
 		// Metadata
 		attendance.Get("/metadata", middleware.RBACMiddleware(data.PERM_AttendanceRead), h.Metadata)
 

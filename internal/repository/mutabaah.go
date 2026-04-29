@@ -6,13 +6,14 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type MutabaahRepository interface {
 	GetTodayLog(ctx context.Context, tx Transaction, employeeID uint, date string) (*dto.MutabaahLogResponse, error)
-	GetAllLogs(ctx context.Context, tx Transaction, params dto.MutabaahListParams) ([]dto.MutabaahLogResponse, error)
+	GetAllLogs(ctx context.Context, tx Transaction, params dto.MutabaahListParams) (dto.PaginatedResponse[dto.MutabaahLogResponse], error)
 	CreateLog(ctx context.Context, tx Transaction, m model.MutabaahLog) (model.MutabaahLog, error)
 	UpdateLog(ctx context.Context, tx Transaction, id uint, updates map[string]interface{}) error
 	GetEmployeesWithAttendanceWithoutMutabaah(ctx context.Context, tx Transaction, date string) ([]struct {
@@ -81,13 +82,56 @@ func (r *mutabaahRepository) GetTodayLog(ctx context.Context, tx Transaction, em
 	return &log, nil
 }
 
-func (r *mutabaahRepository) GetAllLogs(ctx context.Context, tx Transaction, params dto.MutabaahListParams) ([]dto.MutabaahLogResponse, error) {
+func (r *mutabaahRepository) GetAllLogs(ctx context.Context, tx Transaction, params dto.MutabaahListParams) (dto.PaginatedResponse[dto.MutabaahLogResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.MutabaahLogResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM mutabaah_logs ml
+		JOIN employees e ON e.id = ml.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		WHERE ml.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND ml.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.BranchID != nil {
+		baseQuery += " AND e.branch_id = ?"
+		args = append(args, *params.BranchID)
+	}
+	if params.StartDate != nil {
+		baseQuery += " AND ml.log_date >= ?"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil {
+		baseQuery += " AND ml.log_date <= ?"
+		args = append(args, *params.EndDate)
+	}
+	if params.IsSubmitted != nil {
+		baseQuery += " AND ml.is_submitted = ?"
+		args = append(args, *params.IsSubmitted)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.MutabaahLogResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			ml.id,
 			ml.employee_id,
@@ -102,35 +146,31 @@ func (r *mutabaahRepository) GetAllLogs(ctx context.Context, tx Transaction, par
 			ml.is_auto_generated,
 			ml.created_at,
 			ml.updated_at
-		FROM mutabaah_logs ml
-		JOIN employees e ON e.id = ml.employee_id
-		WHERE ml.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	` + baseQuery
 
-	if params.EmployeeID != nil {
-		query += " AND ml.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.StartDate != nil {
-		query += " AND ml.log_date >= ?"
-		args = append(args, *params.StartDate)
-	}
-	if params.EndDate != nil {
-		query += " AND ml.log_date <= ?"
-		args = append(args, *params.EndDate)
-	}
-	if params.IsSubmitted != nil {
-		query += " AND ml.is_submitted = ?"
-		args = append(args, *params.IsSubmitted)
-	}
-	query += " ORDER BY ml.log_date DESC"
+	selectQuery += utils.BuildSortClause("mutabaah", params.SortBy, params.GetSortDir(), "ml.log_date DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var logs []dto.MutabaahLogResponse
-	if err := db.Raw(query, args...).Scan(&logs).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&logs).Error; err != nil {
+		return dto.PaginatedResponse[dto.MutabaahLogResponse]{}, err
 	}
-	return logs, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.MutabaahLogResponse]{
+		Data: logs,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *mutabaahRepository) CreateLog(ctx context.Context, tx Transaction, m model.MutabaahLog) (model.MutabaahLog, error) {

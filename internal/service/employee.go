@@ -16,7 +16,7 @@ import (
 
 type EmployeeService interface {
 	GetMetadata(ctx context.Context) (dto.EmployeeMetadata, error)
-	GetAllEmployees(ctx context.Context) ([]dto.Employee, error)
+	GetAllEmployees(ctx context.Context, params dto.EmployeeListParams) (dto.PaginatedResponse[dto.Employee], error)
 	GetEmployeeByID(ctx context.Context, employeeID string) (dto.Employee, error)
 	CreateEmployee(ctx context.Context, req dto.CreateEmployeeRequest) (dto.Employee, dto.NewEmployeeCred, error)
 	UpdateEmployee(ctx context.Context, id string, req dto.UpdateEmployeeRequest) (dto.Employee, error)
@@ -97,15 +97,15 @@ func (s *employeeService) GetMetadata(ctx context.Context) (dto.EmployeeMetadata
 	}, nil
 }
 
-func (s *employeeService) GetAllEmployees(ctx context.Context) ([]dto.Employee, error) {
-	employees, err := s.repo.GetAllEmployees(ctx, nil)
+func (s *employeeService) GetAllEmployees(ctx context.Context, params dto.EmployeeListParams) (dto.PaginatedResponse[dto.Employee], error) {
+	employees, err := s.repo.GetAllEmployees(ctx, nil, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all employees: %w", err)
+		return dto.PaginatedResponse[dto.Employee]{}, fmt.Errorf("get all employees: %w", err)
 	}
 
 	// Resolve presigned URLs for photo_url
-	for i := range employees {
-		employees[i].PhotoURL = s.resolvePhotoURL(ctx, employees[i].PhotoURL)
+	for i := range employees.Data {
+		employees.Data[i].PhotoURL = s.resolvePhotoURL(ctx, employees.Data[i].PhotoURL)
 	}
 
 	return employees, nil

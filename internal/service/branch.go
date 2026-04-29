@@ -10,7 +10,7 @@ import (
 )
 
 type BranchService interface {
-	GetAllBranches(ctx context.Context) ([]dto.BranchResponse, error)
+	GetAllBranches(ctx context.Context, params dto.BranchListParams) (dto.PaginatedResponse[dto.BranchResponse], error)
 	GetBranchByID(ctx context.Context, id string) (dto.BranchResponse, error)
 	CreateBranch(ctx context.Context, req dto.CreateBranchRequest) (dto.BranchResponse, error)
 	UpdateBranch(ctx context.Context, id string, req dto.UpdateBranchRequest) (dto.BranchResponse, error)
@@ -25,10 +25,10 @@ func NewBranchService(repo repository.BranchRepository) BranchService {
 	return &branchService{repo: repo}
 }
 
-func (s *branchService) GetAllBranches(ctx context.Context) ([]dto.BranchResponse, error) {
-	branches, err := s.repo.GetAllBranches(ctx)
+func (s *branchService) GetAllBranches(ctx context.Context, params dto.BranchListParams) (dto.PaginatedResponse[dto.BranchResponse], error) {
+	branches, err := s.repo.GetAllBranches(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all branches: %w", err)
+		return dto.PaginatedResponse[dto.BranchResponse]{}, fmt.Errorf("get all branches: %w", err)
 	}
 	return branches, nil
 }

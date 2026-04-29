@@ -17,7 +17,7 @@ import (
 
 type HolidayService interface {
 	GetMetadata(ctx context.Context) (dto.HolidayMetadata, error)
-	GetAllHolidays(ctx context.Context, params *dto.HolidayListParams) ([]dto.HolidayResponse, error)
+	GetAllHolidays(ctx context.Context, params *dto.HolidayListParams) (dto.PaginatedResponse[dto.HolidayResponse], error)
 	GetHolidayByID(ctx context.Context, id uint) (dto.HolidayResponse, error)
 	CreateHoliday(ctx context.Context, req dto.CreateHolidayRequest) (dto.HolidayResponse, error)
 	UpdateHoliday(ctx context.Context, id uint, req dto.UpdateHolidayRequest) (dto.HolidayResponse, error)
@@ -52,10 +52,10 @@ func (s *holidayService) GetMetadata(ctx context.Context) (dto.HolidayMetadata, 
 	}, nil
 }
 
-func (s *holidayService) GetAllHolidays(ctx context.Context, params *dto.HolidayListParams) ([]dto.HolidayResponse, error) {
+func (s *holidayService) GetAllHolidays(ctx context.Context, params *dto.HolidayListParams) (dto.PaginatedResponse[dto.HolidayResponse], error) {
 	holidays, err := s.repo.GetAllHolidays(ctx, nil, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all holidays: %w", err)
+		return dto.PaginatedResponse[dto.HolidayResponse]{}, fmt.Errorf("get all holidays: %w", err)
 	}
 	return holidays, nil
 }

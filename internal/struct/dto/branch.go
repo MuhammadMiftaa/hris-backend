@@ -34,3 +34,8 @@ type UpdateBranchRequest struct {
 	RadiusMeters *int     `json:"radius_meters"`
 	AllowWFH     *bool    `json:"allow_wfh"`
 }
+
+type BranchListParams struct {
+	PaginationParams
+	Search *string `query:"search"`
+}

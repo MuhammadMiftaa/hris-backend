@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
+	"time"
 
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -26,11 +29,86 @@ func (h *ShiftHandler) Metadata(c *fiber.Ctx) error {
 }
 
 func (h *ShiftHandler) ListTemplates(c *fiber.Ctx) error {
-	result, err := h.service.GetAllTemplates(c.Context())
+	var params dto.ShiftTemplateListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	result, err := h.service.GetAllTemplates(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Shift template list", Data: result})
+}
+
+func (h *ShiftHandler) ExportTemplates(c *fiber.Ctx) error {
+	var params dto.ShiftTemplateListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	result, err := h.service.GetAllTemplates(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		return h.exportTemplatesCSV(c, result.Data)
+	case dto.ExportPDF:
+		return h.exportTemplatesPDF(c, result.Data)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+func (h *ShiftHandler) exportTemplatesCSV(c *fiber.Ctx, templates []dto.ShiftTemplateResponse) error {
+	headers := []string{"ID", "Nama Template"}
+	var rows [][]string
+	for _, t := range templates {
+		rows = append(rows, []string{
+			fmt.Sprintf("%d", t.ID), t.Name,
+		})
+	}
+	data, err := utils.WriteCSV(headers, rows)
+	if err != nil {
+		return respondError(c, err)
+	}
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename=shift_templates.csv")
+	return c.Send(data)
+}
+
+func (h *ShiftHandler) exportTemplatesPDF(c *fiber.Ctx, templates []dto.ShiftTemplateResponse) error {
+	headers := []string{"ID", "Nama Template"}
+	var rows [][]string
+	for _, t := range templates {
+		rows = append(rows, []string{
+			fmt.Sprintf("%d", t.ID), t.Name,
+		})
+	}
+	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+		Title: "Daftar Template Shift", Date: time.Now().Format("02 Jan 2006"),
+		Headers: headers, Rows: rows, TotalData: len(templates),
+	})
+	if err != nil {
+		return respondError(c, err)
+	}
+	pdf, err := utils.GeneratePDF(html)
+	if err != nil {
+		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename=shift_templates.pdf")
+	return c.Send(pdf)
 }
 
 func (h *ShiftHandler) DetailTemplate(c *fiber.Ctx) error {
@@ -100,25 +178,117 @@ func (h *ShiftHandler) ListDetails(c *fiber.Ctx) error {
 
 func (h *ShiftHandler) ListSchedules(c *fiber.Ctx) error {
 	var params dto.ScheduleListParams
-
-	if v := c.QueryInt("employee_id", 0); v > 0 {
-		uid := uint(v)
-		params.EmployeeID = &uid
-	}
-	if v := c.QueryInt("shift_template_id", 0); v > 0 {
-		uid := uint(v)
-		params.ShiftTemplateID = &uid
-	}
-	if v := c.Query("is_active"); v != "" {
-		b := v == "true"
-		params.IsActive = &b
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
 	}
 
-	result, err := h.service.GetAllSchedules(c.Context(), &params)
+	result, err := h.service.GetAllSchedules(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Schedule list", Data: result})
+}
+
+func (h *ShiftHandler) ExportSchedules(c *fiber.Ctx) error {
+	var params dto.ScheduleListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	result, err := h.service.GetAllSchedules(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		return h.exportSchedulesCSV(c, result.Data)
+	case dto.ExportPDF:
+		return h.exportSchedulesPDF(c, result.Data)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+func (h *ShiftHandler) exportSchedulesCSV(c *fiber.Ctx, schedules []dto.ScheduleResponse) error {
+	headers := []string{"Tanggal Efektif", "Tanggal Selesai", "Pegawai", "Nama Shift", "Status"}
+	var rows [][]string
+	for _, s := range schedules {
+		empName := "-"
+		if s.EmployeeName != nil {
+			empName = *s.EmployeeName
+		}
+		shiftName := "-"
+		if s.ShiftName != nil {
+			shiftName = *s.ShiftName
+		}
+		end := "-"
+		if s.EndDate != nil {
+			end = *s.EndDate
+		}
+		status := "Tidak Aktif"
+		if s.IsActive {
+			status = "Aktif"
+		}
+		rows = append(rows, []string{
+			s.EffectiveDate, end, empName, shiftName, status,
+		})
+	}
+	data, err := utils.WriteCSV(headers, rows)
+	if err != nil {
+		return respondError(c, err)
+	}
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename=jadwal_shift.csv")
+	return c.Send(data)
+}
+
+func (h *ShiftHandler) exportSchedulesPDF(c *fiber.Ctx, schedules []dto.ScheduleResponse) error {
+	headers := []string{"Tanggal Efektif", "Selesai", "Pegawai", "Nama Shift", "Status"}
+	var rows [][]string
+	for _, s := range schedules {
+		empName := "-"
+		if s.EmployeeName != nil {
+			empName = *s.EmployeeName
+		}
+		shiftName := "-"
+		if s.ShiftName != nil {
+			shiftName = *s.ShiftName
+		}
+		end := "-"
+		if s.EndDate != nil {
+			end = *s.EndDate
+		}
+		status := "Tidak Aktif"
+		if s.IsActive {
+			status = "Aktif"
+		}
+		rows = append(rows, []string{
+			s.EffectiveDate, end, empName, shiftName, status,
+		})
+	}
+	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+		Title: "Daftar Jadwal Shift", Date: time.Now().Format("02 Jan 2006"),
+		Headers: headers, Rows: rows, TotalData: len(schedules),
+	})
+	if err != nil {
+		return respondError(c, err)
+	}
+	pdf, err := utils.GeneratePDF(html)
+	if err != nil {
+		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename=jadwal_shift.pdf")
+	return c.Send(pdf)
 }
 
 func (h *ShiftHandler) DetailSchedule(c *fiber.Ctx) error {

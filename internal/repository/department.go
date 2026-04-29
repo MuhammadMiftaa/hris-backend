@@ -6,13 +6,14 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type DepartmentRepository interface {
 	GetBranchMetadata(ctx context.Context) ([]dto.Meta, error)
-	GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) ([]dto.DepartmentResponse, error)
+	GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) (dto.PaginatedResponse[dto.DepartmentResponse], error)
 	GetDepartmentByID(ctx context.Context, id string) (dto.DepartmentResponse, error)
 	CreateDepartment(ctx context.Context, req model.Department) (model.Department, error)
 	UpdateDepartment(ctx context.Context, id string, req model.Department) (model.Department, error)
@@ -40,13 +41,10 @@ func (r *departmentRepository) GetBranchMetadata(ctx context.Context) ([]dto.Met
 	return meta, nil
 }
 
-func (r *departmentRepository) GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) ([]dto.DepartmentResponse, error) {
-	query := `
-		SELECT
-			d.id, d.code, d.name, d.branch_id,
-			b.name AS branch_name,
-			d.description, d.is_active,
-			d.created_at, d.updated_at
+func (r *departmentRepository) GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) (dto.PaginatedResponse[dto.DepartmentResponse], error) {
+	db := r.db.WithContext(ctx)
+
+	baseQuery := `
 		FROM departments d
 		LEFT JOIN branches b ON b.id = d.branch_id AND b.deleted_at IS NULL
 		WHERE d.deleted_at IS NULL
@@ -54,21 +52,55 @@ func (r *departmentRepository) GetAllDepartments(ctx context.Context, params dto
 	args := []interface{}{}
 
 	if params.BranchID != nil {
-		query += " AND d.branch_id = ?"
+		baseQuery += " AND d.branch_id = ?"
 		args = append(args, *params.BranchID)
 	}
 	if params.IsActive != nil {
-		query += " AND d.is_active = ?"
+		baseQuery += " AND d.is_active = ?"
 		args = append(args, *params.IsActive)
 	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (d.name ILIKE ? OR d.code ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
 
-	query += " ORDER BY d.name ASC"
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.DepartmentResponse]{}, err
+	}
+
+	selectQuery := `
+		SELECT
+			d.id, d.code, d.name, d.branch_id,
+			b.name AS branch_name,
+			d.description, d.is_active,
+			d.created_at, d.updated_at
+	` + baseQuery
+
+	selectQuery += utils.BuildSortClause("departments", params.SortBy, params.GetSortDir(), "d.name ASC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var departments []dto.DepartmentResponse
-	if err := r.db.WithContext(ctx).Raw(query, args...).Scan(&departments).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&departments).Error; err != nil {
+		return dto.PaginatedResponse[dto.DepartmentResponse]{}, err
 	}
-	return departments, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.DepartmentResponse]{
+		Data: departments,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *departmentRepository) GetDepartmentByID(ctx context.Context, id string) (dto.DepartmentResponse, error) {

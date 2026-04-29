@@ -16,8 +16,8 @@ import (
 
 type LeaveService interface {
 	GetMetadata(ctx context.Context) (dto.LeaveMetadata, error)
-	GetAllBalances(ctx context.Context, params dto.LeaveBalanceListParams) ([]dto.LeaveBalanceResponse, error)
-	GetAllRequests(ctx context.Context, params dto.LeaveRequestListParams) ([]dto.LeaveRequestResponse, error)
+	GetAllBalances(ctx context.Context, params dto.LeaveBalanceListParams) (dto.PaginatedResponse[dto.LeaveBalanceResponse], error)
+	GetAllRequests(ctx context.Context, params dto.LeaveRequestListParams) (dto.PaginatedResponse[dto.LeaveRequestResponse], error)
 	GetRequestByID(ctx context.Context, id uint) (dto.LeaveRequestResponse, error)
 	CreateRequest(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateLeaveRequest) (dto.LeaveRequestResponse, error)
 	ApproveRequest(ctx context.Context, approverID uint, requestID uint, req dto.ApproveLeaveRequest) (dto.LeaveRequestResponse, error)
@@ -62,24 +62,24 @@ func (s *leaveService) GetMetadata(ctx context.Context) (dto.LeaveMetadata, erro
 	}, nil
 }
 
-func (s *leaveService) GetAllBalances(ctx context.Context, params dto.LeaveBalanceListParams) ([]dto.LeaveBalanceResponse, error) {
+func (s *leaveService) GetAllBalances(ctx context.Context, params dto.LeaveBalanceListParams) (dto.PaginatedResponse[dto.LeaveBalanceResponse], error) {
 	return s.repo.GetAllBalances(ctx, nil, params)
 }
 
-func (s *leaveService) GetAllRequests(ctx context.Context, params dto.LeaveRequestListParams) ([]dto.LeaveRequestResponse, error) {
+func (s *leaveService) GetAllRequests(ctx context.Context, params dto.LeaveRequestListParams) (dto.PaginatedResponse[dto.LeaveRequestResponse], error) {
 	reqs, err := s.repo.GetAllRequests(ctx, nil, params)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.LeaveRequestResponse]{}, err
 	}
-	for i := range reqs {
-		if reqs[i].DocumentURL != nil && *reqs[i].DocumentURL != "" && !strings.HasPrefix(*reqs[i].DocumentURL, "http") {
-			url, err := s.minio.PresignedGetObject(ctx, storage.BucketLeaveDocuments, *reqs[i].DocumentURL, storage.PresignedDownloadExpiry)
+	for i := range reqs.Data {
+		if reqs.Data[i].DocumentURL != nil && *reqs.Data[i].DocumentURL != "" && !strings.HasPrefix(*reqs.Data[i].DocumentURL, "http") {
+			url, err := s.minio.PresignedGetObject(ctx, storage.BucketLeaveDocuments, *reqs.Data[i].DocumentURL, storage.PresignedDownloadExpiry)
 			if err == nil {
-				reqs[i].DocumentURL = &url
+				reqs.Data[i].DocumentURL = &url
 			} else {
 				logger.Warn("presign leave document failed", map[string]any{
-					"request_id": reqs[i].ID,
-					"key":        *reqs[i].DocumentURL,
+					"request_id": reqs.Data[i].ID,
+					"key":        *reqs.Data[i].DocumentURL,
 					"error":      err.Error(),
 				})
 			}

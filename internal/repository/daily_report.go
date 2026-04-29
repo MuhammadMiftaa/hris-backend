@@ -7,12 +7,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type DailyReportRepository interface {
-	GetAll(ctx context.Context, tx Transaction, params dto.DailyReportListParams) ([]dto.DailyReportResponse, error)
+	GetAll(ctx context.Context, tx Transaction, params dto.DailyReportListParams) (dto.PaginatedResponse[dto.DailyReportResponse], error)
 	GetByID(ctx context.Context, tx Transaction, id uint) (*dto.DailyReportResponse, error)
 	Create(ctx context.Context, tx Transaction, m model.DailyReport) (model.DailyReport, error)
 	Update(ctx context.Context, tx Transaction, id uint, updates map[string]interface{}) error
@@ -44,13 +45,47 @@ func (r *dailyReportRepository) getDB(ctx context.Context, tx Transaction) (*gor
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *dailyReportRepository) GetAll(ctx context.Context, tx Transaction, params dto.DailyReportListParams) ([]dto.DailyReportResponse, error) {
+func (r *dailyReportRepository) GetAll(ctx context.Context, tx Transaction, params dto.DailyReportListParams) (dto.PaginatedResponse[dto.DailyReportResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.DailyReportResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM daily_reports d
+		JOIN employees e ON e.id = d.employee_id
+		WHERE d.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND d.employee_id = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.StartDate != nil {
+		baseQuery += " AND d.report_date >= ?::DATE"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil {
+		baseQuery += " AND d.report_date <= ?::DATE"
+		args = append(args, *params.EndDate)
+	}
+	if params.IsSubmitted != nil {
+		baseQuery += " AND d.is_submitted = ?"
+		args = append(args, *params.IsSubmitted)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e.full_name ILIKE ? OR d.activities ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.DailyReportResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			d.id,
 			d.employee_id,
@@ -64,31 +99,31 @@ func (r *dailyReportRepository) GetAll(ctx context.Context, tx Transaction, para
 			'submitted' AS status,
 			d.created_at,
 			d.updated_at
-		FROM daily_reports d
-		JOIN employees e ON e.id = d.employee_id
-		WHERE d.deleted_at IS NULL
-	`
-	args := []interface{}{}
-
-	if params.EmployeeID != nil {
-		query += " AND d.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.StartDate != nil {
-		query += " AND d.report_date >= ?::DATE"
-		args = append(args, *params.StartDate)
-	}
-	if params.EndDate != nil {
-		query += " AND d.report_date <= ?::DATE"
-		args = append(args, *params.EndDate)
-	}
-	query += " ORDER BY d.report_date DESC, d.created_at DESC"
+	` + baseQuery
+	
+	selectQuery += utils.BuildSortClause("daily_reports", params.SortBy, params.GetSortDir(), "d.report_date DESC, d.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.DailyReportResponse
-	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.DailyReportResponse]{}, err
 	}
-	return res, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.DailyReportResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *dailyReportRepository) GetByID(ctx context.Context, tx Transaction, id uint) (*dto.DailyReportResponse, error) {

@@ -7,12 +7,13 @@ import (
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils"
 
 	"gorm.io/gorm"
 )
 
 type HolidayRepository interface {
-	GetAllHolidays(ctx context.Context, tx Transaction, params *dto.HolidayListParams) ([]dto.HolidayResponse, error)
+	GetAllHolidays(ctx context.Context, tx Transaction, params *dto.HolidayListParams) (dto.PaginatedResponse[dto.HolidayResponse], error)
 	GetHolidayByID(ctx context.Context, tx Transaction, id uint) (dto.HolidayResponse, error)
 	CreateHoliday(ctx context.Context, tx Transaction, m model.Holiday) (model.Holiday, error)
 	UpdateHoliday(ctx context.Context, tx Transaction, id uint, m model.Holiday) (model.Holiday, error)
@@ -41,13 +42,45 @@ func (r *holidayRepository) getDB(ctx context.Context, tx Transaction) (*gorm.DB
 	return r.db.WithContext(ctx), nil
 }
 
-func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, params *dto.HolidayListParams) ([]dto.HolidayResponse, error) {
+func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, params *dto.HolidayListParams) (dto.PaginatedResponse[dto.HolidayResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.HolidayResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM holidays h
+		LEFT JOIN branches b ON b.id = h.branch_id AND b.deleted_at IS NULL
+		WHERE h.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params != nil {
+		if params.Year != nil {
+			baseQuery += " AND h.year = ?"
+			args = append(args, *params.Year)
+		}
+		if params.Type != nil {
+			baseQuery += " AND h.type = ?"
+			args = append(args, *params.Type)
+		}
+		if params.BranchID != nil {
+			baseQuery += " AND h.branch_id = ?"
+			args = append(args, *params.BranchID)
+		}
+		if params.Search != nil && *params.Search != "" {
+			baseQuery += " AND (h.name ILIKE ? OR h.description ILIKE ?)"
+			like := "%" + *params.Search + "%"
+			args = append(args, like, like)
+		}
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.HolidayResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			h.id,
 			h.name,
@@ -58,33 +91,40 @@ func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, 
 			b.name       AS branch_name,
 			h.description,
 			h.created_at, h.updated_at, h.deleted_at
-		FROM holidays h
-		LEFT JOIN branches b ON b.id = h.branch_id AND b.deleted_at IS NULL
-		WHERE h.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	` + baseQuery
 
 	if params != nil {
-		if params.Year != nil {
-			query += " AND h.year = ?"
-			args = append(args, *params.Year)
-		}
-		if params.Type != nil {
-			query += " AND h.type = ?"
-			args = append(args, *params.Type)
-		}
-		if params.BranchID != nil {
-			query += " AND h.branch_id = ?"
-			args = append(args, *params.BranchID)
-		}
+		selectQuery += utils.BuildSortClause("holiday", params.SortBy, params.GetSortDir(), "h.date DESC")
+		selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+	} else {
+		selectQuery += " ORDER BY h.date DESC"
 	}
-	query += " ORDER BY h.date DESC"
 
 	var holidays []dto.HolidayResponse
-	if err := db.Raw(query, args...).Scan(&holidays).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&holidays).Error; err != nil {
+		return dto.PaginatedResponse[dto.HolidayResponse]{}, err
 	}
-	return holidays, nil
+
+	perPage := 0
+	page := 1
+	totalPage := 1
+	if params != nil {
+		perPage = params.GetPerPage()
+		page = params.GetPage()
+		if perPage > 0 && total > 0 {
+			totalPage = (total + perPage - 1) / perPage
+		}
+	}
+
+	return dto.PaginatedResponse[dto.HolidayResponse]{
+		Data: holidays,
+		Pagination: dto.PaginationMeta{
+			Page:      page,
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *holidayRepository) GetHolidayByID(ctx context.Context, tx Transaction, id uint) (dto.HolidayResponse, error) {

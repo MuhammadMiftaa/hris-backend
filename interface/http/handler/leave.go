@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"fmt"
+	"time"
+
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -160,4 +164,188 @@ func (h *LeaveHandler) Reject(c *fiber.Ctx) error {
 		Message:    "leave request rejected",
 		Data:       res,
 	})
+}
+
+// ExportBalances — GET /leave-balances/export
+func (h *LeaveHandler) ExportBalances(c *fiber.Ctx) error {
+	var params dto.LeaveBalanceListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	res, err := h.service.GetAllBalances(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		headers := []string{"Nama Pegawai", "Departemen", "Tipe Cuti", "Tahun", "Terpakai (Hari)", "Remaining (Hari)"}
+		var rows [][]string
+		for _, b := range res.Data {
+			deptName := "-"
+			if b.DepartmentName != nil {
+				deptName = *b.DepartmentName
+			}
+			empName := "-"
+			if b.EmployeeName != nil {
+				empName = *b.EmployeeName
+			}
+			leaveName := "-"
+			if b.LeaveTypeName != nil {
+				leaveName = *b.LeaveTypeName
+			}
+			rows = append(rows, []string{
+				empName, deptName, leaveName, fmt.Sprintf("%d", b.Year),
+				fmt.Sprintf("%d", b.UsedDuration), fmt.Sprintf("%d", *b.RemainingDuration),
+			})
+		}
+		data, err := utils.WriteCSV(headers, rows)
+		if err != nil {
+			return respondError(c, err)
+		}
+		c.Set("Content-Type", "text/csv; charset=utf-8")
+		c.Set("Content-Disposition", "attachment; filename=saldo_cuti.csv")
+		return c.Send(data)
+
+	case dto.ExportPDF:
+		headers := []string{"Nama Pegawai", "Departemen", "Tipe Cuti", "Tahun", "Terpakai", "Sisa"}
+		var rows [][]string
+		for _, b := range res.Data {
+			deptName := "-"
+			if b.DepartmentName != nil {
+				deptName = *b.DepartmentName
+			}
+			empName := "-"
+			if b.EmployeeName != nil {
+				empName = *b.EmployeeName
+			}
+			leaveName := "-"
+			if b.LeaveTypeName != nil {
+				leaveName = *b.LeaveTypeName
+			}
+			rows = append(rows, []string{
+				empName, deptName, leaveName, fmt.Sprintf("%d", b.Year),
+				fmt.Sprintf("%d", b.UsedDuration), fmt.Sprintf("%d", *b.RemainingDuration),
+			})
+		}
+		html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+			Title: "Laporan Saldo Cuti", Date: time.Now().Format("02 Jan 2006"),
+			Headers: headers, Rows: rows, TotalData: len(res.Data),
+		})
+		if err != nil {
+			return respondError(c, err)
+		}
+		pdf, err := utils.GeneratePDF(html)
+		if err != nil {
+			return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+		}
+		c.Set("Content-Type", "application/pdf")
+		c.Set("Content-Disposition", "attachment; filename=saldo_cuti.pdf")
+		return c.Send(pdf)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+// ExportRequests — GET /leave-requests/export
+func (h *LeaveHandler) ExportRequests(c *fiber.Ctx) error {
+	var params dto.LeaveRequestListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	res, err := h.service.GetAllRequests(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		headers := []string{"Nama Pegawai", "Departemen", "Tipe Cuti", "Mulai", "Selesai", "Total Hari", "Status", "Alasan"}
+		var rows [][]string
+		for _, req := range res.Data {
+			deptName := "-"
+			if req.DepartmentName != nil {
+				deptName = *req.DepartmentName
+			}
+			empName := "-"
+			if req.EmployeeName != nil {
+				empName = *req.EmployeeName
+			}
+			leaveName := "-"
+			if req.LeaveTypeName != nil {
+				leaveName = *req.LeaveTypeName
+			}
+			reason := "-"
+			if req.Reason != nil {
+				reason = *req.Reason
+			}
+			rows = append(rows, []string{
+				empName, deptName, leaveName,
+				req.StartDate, req.EndDate, fmt.Sprintf("%d", req.TotalDays),
+				req.Status, reason,
+			})
+		}
+		data, err := utils.WriteCSV(headers, rows)
+		if err != nil {
+			return respondError(c, err)
+		}
+		c.Set("Content-Type", "text/csv; charset=utf-8")
+		c.Set("Content-Disposition", "attachment; filename=pengajuan_cuti.csv")
+		return c.Send(data)
+
+	case dto.ExportPDF:
+		headers := []string{"Nama Pegawai", "Departemen", "Tipe Cuti", "Mulai", "Selesai", "Hari", "Status"}
+		var rows [][]string
+		for _, req := range res.Data {
+			deptName := "-"
+			if req.DepartmentName != nil {
+				deptName = *req.DepartmentName
+			}
+			empName := "-"
+			if req.EmployeeName != nil {
+				empName = *req.EmployeeName
+			}
+			leaveName := "-"
+			if req.LeaveTypeName != nil {
+				leaveName = *req.LeaveTypeName
+			}
+			rows = append(rows, []string{
+				empName, deptName, leaveName,
+				req.StartDate, req.EndDate, fmt.Sprintf("%d", req.TotalDays),
+				req.Status,
+			})
+		}
+		html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+			Title: "Laporan Pengajuan Cuti", Date: time.Now().Format("02 Jan 2006"),
+			Headers: headers, Rows: rows, TotalData: len(res.Data),
+		})
+		if err != nil {
+			return respondError(c, err)
+		}
+		pdf, err := utils.GeneratePDF(html)
+		if err != nil {
+			return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+		}
+		c.Set("Content-Type", "application/pdf")
+		c.Set("Content-Disposition", "attachment; filename=pengajuan_cuti.pdf")
+		return c.Send(pdf)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
 }

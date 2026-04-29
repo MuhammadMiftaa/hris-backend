@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"fmt"
+	"time"
+
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -32,7 +36,12 @@ func (h *EmployeeHandler) Metadata(c *fiber.Ctx) error {
 }
 
 func (h *EmployeeHandler) List(c *fiber.Ctx) error {
-	result, err := h.service.GetAllEmployees(c.Context())
+	var params dto.EmployeeListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	result, err := h.service.GetAllEmployees(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -58,6 +67,110 @@ func (h *EmployeeHandler) Detail(c *fiber.Ctx) error {
 		Message:    "Employee detail",
 		Data:       result,
 	})
+}
+
+func (h *EmployeeHandler) Export(c *fiber.Ctx) error {
+	var params dto.EmployeeListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	result, err := h.service.GetAllEmployees(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		return h.exportCSV(c, result.Data)
+	case dto.ExportPDF:
+		return h.exportPDF(c, result.Data)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+func (h *EmployeeHandler) exportCSV(c *fiber.Ctx, employees []dto.Employee) error {
+	headers := []string{"NIP", "Nama Lengkap", "Status", "Departemen", "Jabatan", "Cabang"}
+	var rows [][]string
+	for _, e := range employees {
+		deptName := "-"
+		if e.DepartmentName != nil {
+			deptName = *e.DepartmentName
+		}
+		posName := "-"
+		if e.JobPositionTitle != nil {
+			posName = *e.JobPositionTitle
+		}
+		branch := "-"
+		if e.BranchName != nil {
+			branch = *e.BranchName
+		}
+		status := "Non-Active"
+		if e.IsActive {
+			status = "Active"
+		}
+
+		rows = append(rows, []string{
+			e.EmployeeNumber, e.FullName, status, deptName, posName, branch,
+		})
+	}
+	data, err := utils.WriteCSV(headers, rows)
+	if err != nil {
+		return respondError(c, err)
+	}
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename=pegawai.csv")
+	return c.Send(data)
+}
+
+func (h *EmployeeHandler) exportPDF(c *fiber.Ctx, employees []dto.Employee) error {
+	headers := []string{"NIP", "Nama Lengkap", "Status", "Departemen", "Jabatan", "Cabang"}
+	var rows [][]string
+	for _, e := range employees {
+		deptName := "-"
+		if e.DepartmentName != nil {
+			deptName = *e.DepartmentName
+		}
+		posName := "-"
+		if e.JobPositionTitle != nil {
+			posName = *e.JobPositionTitle
+		}
+		branch := "-"
+		if e.BranchName != nil {
+			branch = *e.BranchName
+		}
+		status := "Non-Active"
+		if e.IsActive {
+			status = "Active"
+		}
+
+		rows = append(rows, []string{
+			e.EmployeeNumber, e.FullName, status, deptName, posName, branch,
+		})
+	}
+	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+		Title: "Daftar Pegawai", Date: time.Now().Format("02 Jan 2006"),
+		Headers: headers, Rows: rows, TotalData: len(employees),
+	})
+	if err != nil {
+		return respondError(c, err)
+	}
+	pdf, err := utils.GeneratePDF(html)
+	if err != nil {
+		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename=pegawai.pdf")
+	return c.Send(pdf)
 }
 
 func (h *EmployeeHandler) Create(c *fiber.Ctx) error {

@@ -29,8 +29,10 @@ type UpdateDepartmentRequest struct {
 }
 
 type DepartmentListParams struct {
-	BranchID *uint `query:"branch_id"`
-	IsActive *bool `query:"is_active"`
+	PaginationParams
+	BranchID *uint   `query:"branch_id"`
+	IsActive *bool   `query:"is_active"`
+	Search   *string `query:"search"`
 }
 
 type DepartmentMetadata struct {
