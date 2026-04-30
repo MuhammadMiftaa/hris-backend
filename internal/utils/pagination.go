@@ -22,6 +22,7 @@ var AllowedSortColumns = map[string]map[string]string{
 		"employee_number": "e.employee_number",
 		"department":      "d.name",
 		"branch":          "b.name",
+		"job_positions_id":"jp.title",
 		"created_at":      "e.created_at",
 	},
 	"branches": {

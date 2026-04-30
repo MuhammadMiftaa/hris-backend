@@ -73,6 +73,14 @@ func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, 
 			like := "%" + *params.Search + "%"
 			args = append(args, like, like)
 		}
+		if params.DateFrom != nil && *params.DateFrom != "" {
+			baseQuery += " AND h.date >= ?::DATE"
+			args = append(args, *params.DateFrom)
+		}
+		if params.DateTo != nil && *params.DateTo != "" {
+			baseQuery += " AND h.date <= ?::DATE"
+			args = append(args, *params.DateTo)
+		}
 	}
 
 	var total int

@@ -305,6 +305,14 @@ func (r *shiftRepository) GetAllSchedules(ctx context.Context, tx Transaction, p
 		like := "%" + *params.Search + "%"
 		args = append(args, like, like, like)
 	}
+	if params.DateFrom != nil && *params.DateFrom != "" {
+		baseQuery += " AND es.effective_date >= ?::DATE"
+		args = append(args, *params.DateFrom)
+	}
+	if params.DateTo != nil && *params.DateTo != "" {
+		baseQuery += " AND (es.end_date IS NULL OR es.end_date <= ?::DATE)"
+		args = append(args, *params.DateTo)
+	}
 
 	var total int
 	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {

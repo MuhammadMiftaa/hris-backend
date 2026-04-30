@@ -182,6 +182,10 @@ func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction
 		baseQuery += " AND a.is_active = ?"
 		args = append(args, *params.IsActive)
 	}
+	if params.JobPositionID != nil {
+		baseQuery += " AND e.job_positions_id = ?"
+		args = append(args, *params.JobPositionID)
+	}
 	if params.Search != nil && *params.Search != "" {
 		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
 		like := "%" + *params.Search + "%"

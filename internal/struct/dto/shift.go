@@ -122,6 +122,8 @@ type ScheduleListParams struct {
 	ShiftTemplateID *uint   `query:"shift_template_id"`
 	IsActive        *bool   `query:"is_active"`
 	Search          *string `query:"search"`
+	DateFrom        *string `query:"date_from"`
+	DateTo          *string `query:"date_to"`
 }
 
 // TodayScheduleResponse — response cek jadwal kerja hari ini untuk pegawai
