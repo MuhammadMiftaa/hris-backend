@@ -38,6 +38,10 @@ type (
 		PublicURL string `env:"MINIO_PUBLIC_URL"`
 	}
 
+	Gotenberg struct {
+		URL string `env:"GOTENBERG_URL"`
+	}
+
 	ExternalAPI struct {
 		IndonesiaHolidayAPIKey string `env:"INDONESIA_HOLIDAY_API_KEY"`
 		IndonesiaHolidayAPIURL string `env:"INDONESIA_HOLIDAY_API_URL"`
@@ -48,6 +52,7 @@ type (
 		Database    Database
 		Redis       Redis
 		Minio       Minio
+		Gotenberg   Gotenberg
 		ExternalAPI ExternalAPI
 	}
 )
@@ -99,6 +104,12 @@ func LoadNative() ([]string, error) {
 	lookupEnv("MINIO_ROOT_USER", &Cfg.Minio.AccessKey, &missing)
 	lookupEnv("MINIO_ROOT_PASSWORD", &Cfg.Minio.SecretKey, &missing)
 	lookupEnv("MINIO_PUBLIC_URL", &Cfg.Minio.PublicURL, &missing)
+
+	if val, ok := os.LookupEnv("GOTENBERG_URL"); ok {
+		Cfg.Gotenberg.URL = val
+	} else {
+		Cfg.Gotenberg.URL = "http://gotenberg:3000"
+	}
 
 	lookupEnv("INDONESIA_HOLIDAY_API_KEY", &Cfg.ExternalAPI.IndonesiaHolidayAPIKey, &missing)
 	lookupEnv("INDONESIA_HOLIDAY_API_URL", &Cfg.ExternalAPI.IndonesiaHolidayAPIURL, &missing)
