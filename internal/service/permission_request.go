@@ -43,11 +43,16 @@ func (s *permissionRequestService) GetMetadata(ctx context.Context) (dto.Request
 	if err != nil {
 		return dto.RequestMetadata{}, err
 	}
+	deptMeta, err := s.repo.GetDepartmentMetaList(ctx, nil)
+	if err != nil {
+		return dto.RequestMetadata{}, err
+	}
 	return dto.RequestMetadata{
 		PermissionTypeMeta: data.PermissionTypeMeta,
 		WorkLocationMeta:   data.WorkLocationMeta,
 		StatusMeta:         data.LeaveRequestStatusMeta,
 		EmployeeMeta:       empMeta,
+		DepartmentMeta:     deptMeta,
 	}, nil
 }
 

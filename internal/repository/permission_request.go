@@ -21,6 +21,7 @@ type PermissionRequestRepository interface {
 
 	// Metadata
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 }
 
 type permissionRequestRepository struct {
@@ -60,6 +61,10 @@ func (r *permissionRequestRepository) GetAll(ctx context.Context, tx Transaction
 	if params.EmployeeID != nil {
 		baseQuery += " AND pr.employee_id = ?"
 		args = append(args, *params.EmployeeID)
+	}
+	if params.PermissionType != nil {
+		baseQuery += " AND pr.permission_type = ?"
+		args = append(args, *params.PermissionType)
 	}
 	if params.DepartmentID != nil {
 		baseQuery += " AND e.department_id = ?"
@@ -217,6 +222,21 @@ func (r *permissionRequestRepository) GetEmployeeMetaList(ctx context.Context, t
 		FROM employees
 		WHERE deleted_at IS NULL
 		ORDER BY full_name ASC
+	`).Scan(&meta).Error
+	return meta, err
+}
+
+func (r *permissionRequestRepository) GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var meta []dto.Meta
+	err = db.Raw(`
+		SELECT id::TEXT, name
+		FROM departments
+		WHERE deleted_at IS NULL
+		ORDER BY name ASC
 	`).Scan(&meta).Error
 	return meta, err
 }

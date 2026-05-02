@@ -22,6 +22,10 @@ type OvertimeRepository interface {
 	UpdateApprovalStatus(ctx context.Context, tx Transaction, approvalID uint, status string, approverID uint, notes *string) error
 	GetPendingApprovalForLevel(ctx context.Context, tx Transaction, requestID uint, level int) (*dto.OvertimeApprovalResponse, error)
 	Delete(ctx context.Context, tx Transaction, id uint) error
+
+	// Metadata
+	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 }
 
 type overtimeRepository struct {
@@ -98,6 +102,9 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 			o.planned_start AS planned_start,
 			o.planned_end AS planned_end,
 			o.planned_minutes,
+			o.actual_start,
+			o.actual_end,
+			o.actual_minutes,
 			o.work_location_type,
 			o.reason,
 			o.status,
@@ -266,4 +273,35 @@ func (r *overtimeRepository) Delete(ctx context.Context, tx Transaction, id uint
 		return err
 	}
 	return db.Delete(&model.OvertimeRequest{}, id).Error
+}
+
+// Metadata
+func (r *overtimeRepository) GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var meta []dto.Meta
+	err = db.Raw(`
+		SELECT id::TEXT, full_name AS name
+		FROM employees
+		WHERE deleted_at IS NULL
+		ORDER BY full_name ASC
+	`).Scan(&meta).Error
+	return meta, err
+}
+
+func (r *overtimeRepository) GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var meta []dto.Meta
+	err = db.Raw(`
+		SELECT id::TEXT, name
+		FROM departments
+		WHERE deleted_at IS NULL
+		ORDER BY name ASC
+	`).Scan(&meta).Error
+	return meta, err
 }

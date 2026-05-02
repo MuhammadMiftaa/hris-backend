@@ -64,3 +64,10 @@ type OvertimeListParams struct {
 	EndDate    *string `query:"end_date"`
 	Search     *string `query:"search"`
 }
+
+type OvertimeMetadata struct {
+	LocationMeta   []Meta `json:"location_meta"`
+	StatusMeta     []Meta `json:"status_meta"`
+	EmployeeMeta   []Meta `json:"employee_meta"`
+	DepartmentMeta []Meta `json:"department_meta"`
+}

@@ -9,9 +9,11 @@ import (
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
 	"hris-backend/internal/utils"
+	"hris-backend/internal/utils/data"
 )
 
 type OvertimeService interface {
+	GetMetadata(ctx context.Context) (dto.OvertimeMetadata, error)
 	GetAll(ctx context.Context, params dto.OvertimeListParams) (dto.PaginatedResponse[dto.OvertimeRequestResponse], error)
 	GetByID(ctx context.Context, id uint) (dto.OvertimeRequestResponse, error)
 	Create(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateOvertimeRequest) (dto.OvertimeRequestResponse, error)
@@ -36,6 +38,23 @@ func NewOvertimeService(
 		attendRepo: attendRepo,
 		txManager:  txManager,
 	}
+}
+
+func (s *overtimeService) GetMetadata(ctx context.Context) (dto.OvertimeMetadata, error) {
+	empMeta, err := s.repo.GetEmployeeMetaList(ctx, nil)
+	if err != nil {
+		return dto.OvertimeMetadata{}, err
+	}
+	deptMeta, err := s.repo.GetDepartmentMetaList(ctx, nil)
+	if err != nil {
+		return dto.OvertimeMetadata{}, err
+	}
+	return dto.OvertimeMetadata{
+		LocationMeta:   data.WorkLocationMeta,
+		StatusMeta:     data.LeaveRequestStatusMeta, // overtime uses similar status values
+		EmployeeMeta:   empMeta,
+		DepartmentMeta: deptMeta,
+	}, nil
 }
 
 func (s *overtimeService) GetAll(ctx context.Context, params dto.OvertimeListParams) (dto.PaginatedResponse[dto.OvertimeRequestResponse], error) {
