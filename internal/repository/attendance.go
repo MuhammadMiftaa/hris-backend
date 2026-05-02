@@ -54,7 +54,7 @@ type AttendanceRepository interface {
 	LinkOvertimeToLog(ctx context.Context, tx Transaction, employeeID uint, date string, logID uint) error
 
 	// Override
-	GetAllOverrides(ctx context.Context, tx Transaction, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error)
+	GetAllOverrides(ctx context.Context, tx Transaction, params dto.OverrideListParams) (dto.PaginatedResponse[dto.AttendanceOverrideResponse], error)
 	GetOverrideByID(ctx context.Context, tx Transaction, id uint) (*dto.AttendanceOverrideResponse, error)
 	CreateOverride(ctx context.Context, tx Transaction, m model.AttendanceOverride) (model.AttendanceOverride, error)
 	UpdateOverrideStatus(ctx context.Context, tx Transaction, id uint, updates map[string]interface{}) error
@@ -65,6 +65,7 @@ type AttendanceRepository interface {
 	// Metadata
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetBranchMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 
 	GetEmployeeRoleLevel(ctx context.Context, tx Transaction, employeeID uint) (string, error)
 }
@@ -224,6 +225,10 @@ func (r *attendanceRepository) GetAllLogs(ctx context.Context, tx Transaction, p
 	if params.BranchID != nil {
 		baseQuery += " AND e.branch_id = ?"
 		args = append(args, *params.BranchID)
+	}
+	if params.Method != nil && *params.Method != "" {
+		baseQuery += " AND al.clock_in_method = ?::clock_method_enum"
+		args = append(args, *params.Method)
 	}
 
 	var total int
@@ -582,19 +587,65 @@ func (r *attendanceRepository) LinkOvertimeToLog(ctx context.Context, tx Transac
 	`, logID, employeeID, date, logID).Error
 }
 
-func (r *attendanceRepository) GetAllOverrides(ctx context.Context, tx Transaction, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error) {
+func (r *attendanceRepository) GetAllOverrides(ctx context.Context, tx Transaction, params dto.OverrideListParams) (dto.PaginatedResponse[dto.AttendanceOverrideResponse], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.AttendanceOverrideResponse]{}, err
 	}
 
-	query := `
+	baseQuery := `
+		FROM attendance_overrides ao
+		JOIN attendance_logs al ON al.id = ao.attendance_log_id
+		JOIN employees e1 ON e1.id = al.employee_id
+		LEFT JOIN departments d ON d.id = e1.department_id AND d.deleted_at IS NULL
+		LEFT JOIN employees e2 ON e2.id = ao.approved_by
+		WHERE ao.deleted_at IS NULL
+	`
+	args := []interface{}{}
+
+	if params.EmployeeID != nil {
+		baseQuery += " AND ao.requested_by = ?"
+		args = append(args, *params.EmployeeID)
+	}
+	if params.Status != nil && *params.Status != "" {
+		baseQuery += " AND ao.status = ?"
+		args = append(args, *params.Status)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e1.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.Search != nil && *params.Search != "" {
+		baseQuery += " AND (e1.full_name ILIKE ? OR e1.employee_number ILIKE ?)"
+		like := "%" + *params.Search + "%"
+		args = append(args, like, like)
+	}
+	if params.StartDate != nil && *params.StartDate != "" {
+		baseQuery += " AND al.attendance_date >= ?::DATE"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil && *params.EndDate != "" {
+		baseQuery += " AND al.attendance_date <= ?::DATE"
+		args = append(args, *params.EndDate)
+	}
+	if params.OverrideType != nil && *params.OverrideType != "" {
+		baseQuery += " AND ao.override_type = ?"
+		args = append(args, *params.OverrideType)
+	}
+
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.AttendanceOverrideResponse]{}, err
+	}
+
+	selectQuery := `
 		SELECT
 			ao.id,
 			ao.attendance_log_id,
 			al.attendance_date::TEXT AS attendance_date,
 			ao.requested_by,
 			e1.full_name             AS requester_name,
+			d.name                   AS department_name,
 			ao.approved_by,
 			e2.full_name             AS approver_name,
 			ao.override_type,
@@ -606,29 +657,31 @@ func (r *attendanceRepository) GetAllOverrides(ctx context.Context, tx Transacti
 			ao.status,
 			ao.created_at,
 			ao.updated_at
-		FROM attendance_overrides ao
-		JOIN attendance_logs al ON al.id = ao.attendance_log_id
-		JOIN employees e1 ON e1.id = al.employee_id
-		LEFT JOIN employees e2 ON e2.id = ao.approved_by
-		WHERE ao.deleted_at IS NULL
-	`
-	args := []interface{}{}
+	` + baseQuery
 
-	if params.EmployeeID != nil {
-		query += " AND ao.requested_by = ?"
-		args = append(args, *params.EmployeeID)
-	}
-	if params.Status != nil {
-		query += " AND ao.status = ?"
-		args = append(args, *params.Status)
-	}
-	query += " ORDER BY ao.created_at DESC"
+	selectQuery += utils.BuildSortClause("attendance_override", params.SortBy, params.GetSortDir(), "ao.created_at DESC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var resp []dto.AttendanceOverrideResponse
-	if err := db.Raw(query, args...).Scan(&resp).Error; err != nil {
-		return nil, err
+	if err := db.Raw(selectQuery, args...).Scan(&resp).Error; err != nil {
+		return dto.PaginatedResponse[dto.AttendanceOverrideResponse]{}, err
 	}
-	return resp, nil
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.AttendanceOverrideResponse]{
+		Data: resp,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *attendanceRepository) GetOverrideByID(ctx context.Context, tx Transaction, id uint) (*dto.AttendanceOverrideResponse, error) {
@@ -718,6 +771,21 @@ func (r *attendanceRepository) GetBranchMetaList(ctx context.Context, tx Transac
 	err = db.Raw(`
 		SELECT id::TEXT, name
 		FROM branches
+		WHERE deleted_at IS NULL
+		ORDER BY name ASC
+	`).Scan(&meta).Error
+	return meta, err
+}
+
+func (r *attendanceRepository) GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var meta []dto.Meta
+	err = db.Raw(`
+		SELECT id::TEXT, name
+		FROM departments
 		WHERE deleted_at IS NULL
 		ORDER BY name ASC
 	`).Scan(&meta).Error

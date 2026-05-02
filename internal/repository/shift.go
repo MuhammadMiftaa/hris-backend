@@ -9,6 +9,7 @@ import (
 	"hris-backend/internal/struct/model"
 	"hris-backend/internal/utils"
 
+	"github.com/gofiber/fiber/v2/log"
 	"gorm.io/gorm"
 )
 
@@ -75,6 +76,14 @@ func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transacti
 	if params.Search != nil && *params.Search != "" {
 		baseQuery += " AND name ILIKE ?"
 		args = append(args, "%"+*params.Search+"%")
+	}
+	if params.IsFlexible != nil {
+		baseQuery += " AND is_flexible = ?"
+		args = append(args, *params.IsFlexible)
+	}
+	if params.CanWFA != nil {
+		baseQuery += " AND can_wfa = ?"
+		args = append(args, *params.CanWFA)
 	}
 
 	var total int
@@ -338,6 +347,7 @@ func (r *shiftRepository) GetAllSchedules(ctx context.Context, tx Transaction, p
 
 	var schedules []dto.ScheduleResponse
 	if err := db.Raw(selectQuery, args...).Scan(&schedules).Error; err != nil {
+		log.Error(err)
 		return dto.PaginatedResponse[dto.ScheduleResponse]{}, err
 	}
 

@@ -95,7 +95,8 @@ type AttendanceListParams struct {
 	EndDate      *string `query:"end_date"`
 	Status       *string `query:"status"`
 	BranchID     *uint   `query:"branch_id"`
-	Search       *string `query:"search"` // search by employee_name, employee_number
+	Method       *string `query:"clock_in_method"` // selfie, qr_code, manual
+	Search       *string `query:"search"`           // search by employee_name, employee_number
 }
 
 type MutabaahSubmitRequest struct {

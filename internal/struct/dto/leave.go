@@ -74,9 +74,11 @@ type RejectLeaveRequest struct {
 
 type LeaveBalanceListParams struct {
 	PaginationParams
-	EmployeeID *uint   `query:"employee_id"`
-	Year       *int    `query:"year"`
-	Search     *string `query:"search"`
+	EmployeeID   *uint   `query:"employee_id"`
+	Year         *int    `query:"year"`
+	Search       *string `query:"search"`
+	DepartmentID *uint   `query:"department_id"`
+	LeaveTypeID  *uint   `query:"leave_type_id"`
 }
 
 type LeaveRequestListParams struct {

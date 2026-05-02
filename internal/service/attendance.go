@@ -22,7 +22,7 @@ type AttendanceService interface {
 	GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) (dto.PaginatedResponse[dto.AttendanceLogResponse], error)
 	GetMetadata(ctx context.Context) (dto.AttendanceMetadata, error)
 	CreateManualAttendance(ctx context.Context, employeeID uint, req dto.CreateManualAttendanceRequest) (dto.AttendanceLogResponse, error)
-	GetAllOverrides(ctx context.Context, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error)
+	GetAllOverrides(ctx context.Context, params dto.OverrideListParams) (dto.PaginatedResponse[dto.AttendanceOverrideResponse], error)
 	GetOverrideByID(ctx context.Context, id uint) (dto.AttendanceOverrideResponse, error)
 	CreateOverride(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateOverrideRequest) (dto.AttendanceOverrideResponse, error)
 	UpdateOverrideStatus(ctx context.Context, employeeID uint, roleLevel string, id uint, req dto.UpdateOverrideStatusRequest) (dto.AttendanceOverrideResponse, error)
@@ -527,12 +527,18 @@ func (s *attendanceService) GetMetadata(ctx context.Context) (dto.AttendanceMeta
 		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch branch meta: %w", err)
 	}
 
+	deptMeta, err := s.repo.GetDepartmentMetaList(ctx, nil)
+	if err != nil {
+		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch department meta: %w", err)
+	}
+
 	return dto.AttendanceMetadata{
 		StatusMeta:       data.AttendanceStatusMeta,
 		ClockMethodMeta:  data.ClockMethodMeta,
 		OverrideTypeMeta: data.OverrideTypeMeta,
 		EmployeeMeta:     empMeta,
 		BranchMeta:       branchMeta,
+		DepartmentMeta:   deptMeta,
 	}, nil
 }
 
@@ -624,7 +630,7 @@ func (s *attendanceService) CreateManualAttendance(ctx context.Context, employee
 	return *result, nil
 }
 
-func (s *attendanceService) GetAllOverrides(ctx context.Context, params dto.OverrideListParams) ([]dto.AttendanceOverrideResponse, error) {
+func (s *attendanceService) GetAllOverrides(ctx context.Context, params dto.OverrideListParams) (dto.PaginatedResponse[dto.AttendanceOverrideResponse], error) {
 	return s.repo.GetAllOverrides(ctx, nil, params)
 }
 

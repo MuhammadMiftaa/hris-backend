@@ -16,8 +16,14 @@ type UpdateOverrideStatusRequest struct {
 }
 
 type OverrideListParams struct {
-	EmployeeID *uint   `query:"employee_id"`
-	Status     *string `query:"status"`
+	PaginationParams
+	EmployeeID   *uint   `query:"employee_id"`
+	Status       *string `query:"status"`
+	DepartmentID *uint   `query:"department_id"`
+	Search       *string `query:"search"`
+	StartDate    *string `query:"start_date"`
+	EndDate      *string `query:"end_date"`
+	OverrideType *string `query:"override_type"`
 }
 
 type AttendanceOverrideResponse struct {
@@ -26,6 +32,7 @@ type AttendanceOverrideResponse struct {
 	AttendanceDate    *string    `json:"attendance_date"`
 	RequestedBy       uint       `json:"requested_by"`
 	RequesterName     *string    `json:"requester_name"`
+	DepartmentName    *string    `json:"department_name"`
 	ApprovedBy        *uint      `json:"approved_by"`
 	ApproverName      *string    `json:"approver_name"`
 	OverrideType      string     `json:"override_type"`
@@ -54,4 +61,5 @@ type AttendanceMetadata struct {
 	OverrideTypeMeta []Meta `json:"override_type_meta"`
 	EmployeeMeta     []Meta `json:"employee_meta"`
 	BranchMeta       []Meta `json:"branch_meta"`
+	DepartmentMeta   []Meta `json:"department_meta"`
 }

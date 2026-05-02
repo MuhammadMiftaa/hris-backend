@@ -70,7 +70,9 @@ type ShiftMetadata struct {
 
 type ShiftTemplateListParams struct {
 	PaginationParams
-	Search *string `query:"search"`
+	IsFlexible *bool   `query:"is_flexible"`
+	CanWFA     *bool   `query:"can_wfa"`
+	Search     *string `query:"search"`
 }
 
 type CreateShiftDetailRequest struct {

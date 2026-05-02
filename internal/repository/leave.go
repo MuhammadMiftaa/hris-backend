@@ -37,6 +37,7 @@ type LeaveRepository interface {
 	// Metadata
 	GetLeaveTypeMeta(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 }
 
 type leaveRepository struct {
@@ -77,6 +78,14 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 	if params.EmployeeID != nil {
 		baseQuery += " AND b.employee_id = ?"
 		args = append(args, *params.EmployeeID)
+	}
+	if params.LeaveTypeID != nil {
+		baseQuery += " AND b.leave_type_id = ?"
+		args = append(args, *params.LeaveTypeID)
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
 	}
 	if params.Year != nil {
 		baseQuery += " AND b.year = ?"
@@ -220,7 +229,11 @@ func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, pa
 		baseQuery += " AND r.employee_id = ?"
 		args = append(args, *params.EmployeeID)
 	}
-	if params.Status != nil {
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.Status != nil && *params.Status != "" {
 		baseQuery += " AND r.status = ?"
 		args = append(args, *params.Status)
 	}
@@ -479,4 +492,14 @@ func (r *leaveRepository) GetEmployeeMetaList(ctx context.Context, tx Transactio
 		ORDER BY full_name ASC
 	`).Scan(&meta).Error
 	return meta, err
+}
+
+func (r *leaveRepository) GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var res []dto.Meta
+	err = db.Raw(`SELECT id::TEXT, name FROM departments WHERE deleted_at IS NULL ORDER BY name ASC`).Scan(&res).Error
+	return res, err
 }

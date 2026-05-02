@@ -191,6 +191,10 @@ func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction
 		like := "%" + *params.Search + "%"
 		args = append(args, like, like)
 	}
+	if params.IsTrainer != nil {
+		baseQuery += " AND e.is_trainer = ?"
+		args = append(args, *params.IsTrainer)
+	}
 
 	var total int
 	if err := db.Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {

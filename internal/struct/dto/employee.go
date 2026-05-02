@@ -72,6 +72,7 @@ type EmployeeListParams struct {
 	DepartmentID   *uint   `query:"department_id"`
 	JobPositionID  *uint   `query:"job_positions_id"`
 	IsActive       *bool   `query:"is_active"`
+	IsTrainer      *bool   `query:"is_trainer"`
 	Search         *string `query:"search"`
 }
 

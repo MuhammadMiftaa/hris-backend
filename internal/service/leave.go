@@ -54,11 +54,16 @@ func (s *leaveService) GetMetadata(ctx context.Context) (dto.LeaveMetadata, erro
 	if err != nil {
 		return dto.LeaveMetadata{}, err
 	}
+	deptMeta, err := s.repo.GetDepartmentMetaList(ctx, nil)
+	if err != nil {
+		return dto.LeaveMetadata{}, err
+	}
 
 	return dto.LeaveMetadata{
-		LeaveTypeMeta: leaveTypeMeta,
-		StatusMeta:    data.LeaveRequestStatusMeta,
-		EmployeeMeta:  empMeta,
+		LeaveTypeMeta:  leaveTypeMeta,
+		StatusMeta:     data.LeaveRequestStatusMeta,
+		EmployeeMeta:   empMeta,
+		DepartmentMeta: deptMeta,
 	}, nil
 }
 
