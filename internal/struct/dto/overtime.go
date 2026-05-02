@@ -63,6 +63,7 @@ type OvertimeListParams struct {
 	StartDate  *string `query:"start_date"`
 	EndDate    *string `query:"end_date"`
 	Search     *string `query:"search"`
+	WorkLocationType *string `query:"work_location_type"`
 }
 
 type OvertimeMetadata struct {

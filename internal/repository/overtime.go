@@ -81,6 +81,10 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 		baseQuery += " AND o.overtime_date <= ?::DATE"
 		args = append(args, *params.EndDate)
 	}
+	if params.WorkLocationType != nil && *params.WorkLocationType != "" {
+		baseQuery += " AND o.work_location_type = ?"
+		args = append(args, *params.WorkLocationType)
+	}
 	if params.Search != nil && *params.Search != "" {
 		baseQuery += " AND (e.full_name ILIKE ? OR o.reason ILIKE ?)"
 		like := "%" + *params.Search + "%"
