@@ -147,6 +147,7 @@ type MutabaahDailyReport struct {
 	EmployeeNumber string  `json:"employee_number"`
 	DepartmentName *string `json:"department_name"`
 	IsTrainer      bool    `json:"is_trainer"`
+	LogDate        string  `json:"log_date"`
 	TargetPages    int     `json:"target_pages"`
 	IsSubmitted    bool    `json:"is_submitted"`
 	SubmittedAt    *string `json:"submitted_at"`
@@ -155,6 +156,7 @@ type MutabaahDailyReport struct {
 type MutabaahMonthlySummary struct {
 	EmployeeID           uint    `json:"employee_id"`
 	EmployeeName         string  `json:"employee_name"`
+	DepartmentName       *string `json:"department_name"`
 	IsTrainer            bool    `json:"is_trainer"`
 	TotalWorkingDays     int     `json:"total_working_days"`
 	TotalSubmitted       int     `json:"total_submitted"`

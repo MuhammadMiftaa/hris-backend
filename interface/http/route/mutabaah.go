@@ -36,7 +36,9 @@ func MutabaahRoutes(app *fiber.App, db *gorm.DB) {
 
 		// Admin: laporan
 		mutabaah.Get("/report/daily", middleware.RBACMiddleware(data.PERM_MutabaahRead), h.GetDailyReport)
+		mutabaah.Get("/report/daily/export", middleware.RBACMiddleware(data.PERM_MutabaahRead), h.ExportDailyReport)
 		mutabaah.Get("/report/monthly", middleware.RBACMiddleware(data.PERM_MutabaahRead), h.GetMonthlyReport)
+		mutabaah.Get("/report/monthly/export", middleware.RBACMiddleware(data.PERM_MutabaahRead), h.ExportMonthlyReport)
 		mutabaah.Get("/report/category", middleware.RBACMiddleware(data.PERM_MutabaahRead), h.GetCategoryReport)
 	}
 }

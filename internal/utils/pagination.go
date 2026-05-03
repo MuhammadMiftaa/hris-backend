@@ -104,6 +104,7 @@ var AllowedSortColumns = map[string]map[string]string{
 		"employee_name": "e.full_name",
 		"is_submitted":  "ml.is_submitted",
 		"target_pages":  "ml.target_pages",
+		"status":        "ml.is_submitted",
 		"created_at":    "ml.created_at",
 	},
 	"overtime": {

@@ -201,12 +201,13 @@ func (h *MutabaahHandler) HRDCancel(c *fiber.Ctx) error {
 }
 
 func (h *MutabaahHandler) GetDailyReport(c *fiber.Ctx) error {
-	date := c.Query("date")
-	if date == "" {
-		return respondBadRequest(c, "query date wajib diisi (format YYYY-MM-DD)")
+	startDate := c.Query("start_date", c.Query("date"))
+	endDate := c.Query("end_date", startDate)
+	if startDate == "" {
+		return respondBadRequest(c, "query start_date atau date wajib diisi (format YYYY-MM-DD)")
 	}
 
-	result, err := h.service.GetDailyReport(c.Context(), date)
+	result, err := h.service.GetDailyReport(c.Context(), startDate, endDate)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -254,4 +255,131 @@ func (h *MutabaahHandler) GetCategoryReport(c *fiber.Ctx) error {
 		Message:    "mutabaah category report",
 		Data:       result,
 	})
+}
+
+// ExportDailyReport — GET /mutabaah/report/daily/export?start_date=...&end_date=...&format=csv|pdf
+func (h *MutabaahHandler) ExportDailyReport(c *fiber.Ctx) error {
+	startDate := c.Query("start_date", c.Query("date"))
+	endDate := c.Query("end_date", startDate)
+	if startDate == "" {
+		return respondBadRequest(c, "query start_date atau date wajib diisi (format YYYY-MM-DD)")
+	}
+	format := c.Query("format", "csv")
+
+	result, err := h.service.GetDailyReport(c.Context(), startDate, endDate)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	headers := []string{"Nama", "NIP", "Departemen", "Kategori", "Target (hlm)", "Status", "Waktu Submit"}
+	var rows [][]string
+	for _, r := range result {
+		cat := "Non-Trainer"
+		if r.IsTrainer {
+			cat = "Trainer"
+		}
+		status := "Belum"
+		if r.IsSubmitted {
+			status = "Sudah"
+		}
+		dept := "-"
+		if r.DepartmentName != nil {
+			dept = *r.DepartmentName
+		}
+		submittedAt := "-"
+		if r.SubmittedAt != nil {
+			submittedAt = *r.SubmittedAt
+		}
+		rows = append(rows, []string{
+			r.EmployeeName, r.EmployeeNumber, dept, cat,
+			fmt.Sprintf("%d", r.TargetPages), status, submittedAt,
+		})
+	}
+
+	switch format {
+	case "pdf":
+		html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+			Title: "Mutabaah Harian — " + startDate + " s/d " + endDate, Date: time.Now().Format("02 Jan 2006"),
+			Headers: headers, Rows: rows, TotalData: len(result),
+		})
+		if err != nil {
+			return respondError(c, err)
+		}
+		pdf, err := utils.GeneratePDF(html)
+		if err != nil {
+			return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+		}
+		c.Set("Content-Type", "application/pdf")
+		c.Set("Content-Disposition", "attachment; filename=mutabaah_harian.pdf")
+		return c.Send(pdf)
+	default:
+		data, err := utils.WriteCSV(headers, rows)
+		if err != nil {
+			return respondError(c, err)
+		}
+		c.Set("Content-Type", "text/csv; charset=utf-8")
+		c.Set("Content-Disposition", "attachment; filename=mutabaah_harian.csv")
+		return c.Send(data)
+	}
+}
+
+// ExportMonthlyReport — GET /mutabaah/report/monthly/export?month=...&year=...&format=csv|pdf
+func (h *MutabaahHandler) ExportMonthlyReport(c *fiber.Ctx) error {
+	month := c.QueryInt("month")
+	year := c.QueryInt("year")
+	if month <= 0 || month > 12 || year <= 0 {
+		return respondBadRequest(c, "query month dan year wajib diisi dan valid")
+	}
+	format := c.Query("format", "csv")
+
+	result, err := h.service.GetMonthlyReport(c.Context(), month, year)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	headers := []string{"Nama", "Departemen", "Kategori", "Hari Wajib", "Hari Submit", "% Kepatuhan"}
+	var rows [][]string
+	for _, r := range result {
+		cat := "Non-Trainer"
+		if r.IsTrainer {
+			cat = "Trainer"
+		}
+		dept := "-"
+		if r.DepartmentName != nil {
+			dept = *r.DepartmentName
+		}
+		rows = append(rows, []string{
+			r.EmployeeName, dept, cat,
+			fmt.Sprintf("%d", r.TotalWorkingDays),
+			fmt.Sprintf("%d", r.TotalSubmitted),
+			fmt.Sprintf("%.1f%%", r.CompliancePercentage),
+		})
+	}
+
+	switch format {
+	case "pdf":
+		html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+			Title:   fmt.Sprintf("Mutabaah Bulanan — %d/%d", month, year),
+			Date:    time.Now().Format("02 Jan 2006"),
+			Headers: headers, Rows: rows, TotalData: len(result),
+		})
+		if err != nil {
+			return respondError(c, err)
+		}
+		pdf, err := utils.GeneratePDF(html)
+		if err != nil {
+			return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+		}
+		c.Set("Content-Type", "application/pdf")
+		c.Set("Content-Disposition", "attachment; filename=mutabaah_bulanan.pdf")
+		return c.Send(pdf)
+	default:
+		data, err := utils.WriteCSV(headers, rows)
+		if err != nil {
+			return respondError(c, err)
+		}
+		c.Set("Content-Type", "text/csv; charset=utf-8")
+		c.Set("Content-Disposition", "attachment; filename=mutabaah_bulanan.csv")
+		return c.Send(data)
+	}
 }
