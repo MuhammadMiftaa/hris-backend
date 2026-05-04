@@ -51,8 +51,8 @@ type HolidayListParams struct {
 	Type     *string `query:"type"`
 	BranchID *uint   `query:"branch_id"`
 	Name     *string `query:"name"`
-	DateFrom *string `query:"date_from"`
-	DateTo   *string `query:"date_to"`
+	StartDate *string `query:"start_date"`
+	EndDate   *string `query:"end_date"`
 }
 
 // ── External API ───────────────────────────────────────

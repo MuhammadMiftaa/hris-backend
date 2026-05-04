@@ -56,9 +56,17 @@ func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, 
 	args := []interface{}{}
 
 	if params != nil {
-		if params.Year != nil {
+		if params.StartDate != nil && *params.StartDate != "" {
+			baseQuery += " AND h.date::DATE >= ?::DATE"
+			args = append(args, *params.StartDate)
+		}
+		if params.EndDate != nil && *params.EndDate != "" {
+			baseQuery += " AND h.date::DATE <= ?::DATE"
+			args = append(args, *params.EndDate)
+		}
+		if !(params.StartDate != nil && *params.StartDate != "") && !(params.EndDate != nil && *params.EndDate != "") {
 			baseQuery += " AND h.year = ?"
-			args = append(args, *params.Year)
+			args = append(args, utils.NowWIB().Year())
 		}
 		if params.Type != nil {
 			baseQuery += " AND h.type = ?"
@@ -71,14 +79,6 @@ func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, 
 		if params.Name != nil && *params.Name != "" {
 			baseQuery += " AND h.name ILIKE ?"
 			args = append(args, "%"+*params.Name+"%")
-		}
-		if params.DateFrom != nil && *params.DateFrom != "" {
-			baseQuery += " AND h.date >= ?::DATE"
-			args = append(args, *params.DateFrom)
-		}
-		if params.DateTo != nil && *params.DateTo != "" {
-			baseQuery += " AND h.date <= ?::DATE"
-			args = append(args, *params.DateTo)
 		}
 	}
 

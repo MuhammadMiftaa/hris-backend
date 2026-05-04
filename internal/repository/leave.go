@@ -242,9 +242,13 @@ func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, pa
 		baseQuery += " AND r.leave_type_id = ?"
 		args = append(args, *params.LeaveTypeID)
 	}
-	if params.Year != nil {
-		baseQuery += " AND EXTRACT(YEAR FROM r.start_date) = ?"
-		args = append(args, *params.Year)
+	if params.StartDate != nil && *params.StartDate != "" {
+		baseQuery += " AND r.start_date::DATE >= ?::DATE"
+		args = append(args, *params.StartDate)
+	}
+	if params.EndDate != nil && *params.EndDate != "" {
+		baseQuery += " AND r.end_date::DATE <= ?::DATE"
+		args = append(args, *params.EndDate)
 	}
 	if params.EmployeeName != nil && *params.EmployeeName != "" {
 		baseQuery += " AND e.full_name ILIKE ?"
