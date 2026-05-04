@@ -23,12 +23,14 @@ func LeaveRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 
 	balances := app.Group("/leave-balances")
 	{
-		balances.Get("/", middleware.RBACMiddleware(data.PERM_LeaveRead), h.ListBalances)
+		balances.Get("/", middleware.RBACMiddleware(data.PERM_LeaveBalanceRead), h.ListBalances)
+		balances.Get("/export", middleware.RBACMiddleware(data.PERM_LeaveBalanceExport), h.ExportBalances)
 	}
 
 	requests := app.Group("/leave-requests")
 	{
 		requests.Get("/", middleware.RBACMiddleware(data.PERM_LeaveRead), h.ListRequests)
+		requests.Get("/export", middleware.RBACMiddleware(data.PERM_LeaveExport), h.ExportRequests)
 		requests.Get("/:id", middleware.RBACMiddleware(data.PERM_LeaveRead), h.DetailRequest)
 		requests.Post("/", middleware.RBACMiddleware(data.PERM_LeaveCreate), h.Create)
 		requests.Put("/:id/approve", middleware.RBACMiddleware(data.PERM_LeaveUpdate), h.Approve)

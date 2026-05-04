@@ -20,12 +20,12 @@ func OvertimeRoutes(app *fiber.App, db *gorm.DB) {
 
 	ots := app.Group("/overtime-requests")
 	{
-		ots.Get("/", middleware.RBACMiddleware(data.PERM_RequestRead), h.List)
-		ots.Get("/export", middleware.RBACMiddleware(data.PERM_RequestRead), h.Export)
-		ots.Get("/:id", middleware.RBACMiddleware(data.PERM_RequestRead), h.Detail)
-		ots.Post("/", middleware.RBACMiddleware(data.PERM_RequestCreate), h.Create)
-		ots.Put("/:id/approve", middleware.RBACMiddleware(data.PERM_OvertimeUpdate), h.Approve)
-		ots.Put("/:id/reject", middleware.RBACMiddleware(data.PERM_OvertimeUpdate), h.Reject)
-		ots.Delete("/:id", middleware.RBACMiddleware(data.PERM_RequestDelete), h.Delete)
+		ots.Get("/", middleware.RBACMiddleware(data.PERM_OvertimeRead), h.List)
+		ots.Get("/export", middleware.RBACMiddleware(data.PERM_OvertimeExport), h.Export)
+		ots.Get("/:id", middleware.RBACMiddleware(data.PERM_OvertimeRead), h.Detail)
+		ots.Post("/", middleware.RBACMiddleware(data.PERM_OvertimeCreate), h.Create)
+		ots.Put("/:id/approve", middleware.RBACMiddleware(data.PERM_OvertimeApprove), h.Approve)
+		ots.Put("/:id/reject", middleware.RBACMiddleware(data.PERM_OvertimeApprove), h.Reject)
+		// ots.Delete("/:id", middleware.RBACMiddleware(data.PERM_OvertimeDelete), h.Delete)
 	}
 }

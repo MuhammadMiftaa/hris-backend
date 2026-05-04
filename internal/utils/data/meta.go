@@ -177,6 +177,7 @@ var (
 		{ID: "create", Name: "Tambah"},
 		{ID: "update", Name: "Edit"},
 		{ID: "delete", Name: "Hapus"},
+		{ID: "export", Name: "Export"},
 		{ID: "approve", Name: "Approve"},
 		{ID: "leader_approve", Name: "Approve Leader"},
 		{ID: "hr_approve", Name: "Approve HR"},

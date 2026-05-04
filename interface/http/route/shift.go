@@ -20,7 +20,7 @@ func ShiftRoutes(app *fiber.App, db *gorm.DB) {
 	{
 		shifts.Get("/metadata", h.Metadata)
 		shifts.Get("/", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ListTemplates)
-		shifts.Get("/export", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ExportTemplates)
+		shifts.Get("/export", middleware.RBACMiddleware(data.PERM_TemplateShiftExport), h.ExportTemplates)
 		shifts.Get("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.DetailTemplate)
 		shifts.Post("/", middleware.RBACMiddleware(data.PERM_TemplateShiftCreate), h.CreateTemplate)
 		shifts.Put("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftUpdate), h.UpdateTemplate)
@@ -31,11 +31,11 @@ func ShiftRoutes(app *fiber.App, db *gorm.DB) {
 	schedules := app.Group("/schedules")
 	{
 		schedules.Get("/my-today", middleware.RBACMiddleware(data.PERM_HomeEmployeeRead), h.CheckTodaySchedule)
-		schedules.Get("/", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ListSchedules)
-		schedules.Get("/export", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ExportSchedules)
-		schedules.Get("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.DetailSchedule)
-		schedules.Post("/", middleware.RBACMiddleware(data.PERM_TemplateShiftCreate), h.CreateSchedule)
-		schedules.Put("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftUpdate), h.UpdateSchedule)
-		schedules.Delete("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftDelete), h.DeleteSchedule)
+		schedules.Get("/", middleware.RBACMiddleware(data.PERM_ScheduleRead), h.ListSchedules)
+		schedules.Get("/export", middleware.RBACMiddleware(data.PERM_ScheduleExport), h.ExportSchedules)
+		schedules.Get("/:id", middleware.RBACMiddleware(data.PERM_ScheduleRead), h.DetailSchedule)
+		schedules.Post("/", middleware.RBACMiddleware(data.PERM_ScheduleCreate), h.CreateSchedule)
+		schedules.Put("/:id", middleware.RBACMiddleware(data.PERM_ScheduleUpdate), h.UpdateSchedule)
+		schedules.Delete("/:id", middleware.RBACMiddleware(data.PERM_ScheduleDelete), h.DeleteSchedule)
 	}
 }

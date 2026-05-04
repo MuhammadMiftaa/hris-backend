@@ -21,11 +21,11 @@ func BusinessTripRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) 
 
 	trips := app.Group("/business-trips")
 	{
-		trips.Get("/", middleware.RBACMiddleware(data.PERM_RequestRead), h.List)
-		trips.Get("/export", middleware.RBACMiddleware(data.PERM_RequestRead), h.Export)
-		trips.Get("/:id", middleware.RBACMiddleware(data.PERM_RequestRead), h.Detail)
-		trips.Post("/", middleware.RBACMiddleware(data.PERM_RequestCreate), h.Create)
-		trips.Put("/:id", middleware.RBACMiddleware(data.PERM_RequestUpdate), h.UpdateStatus)
-		trips.Delete("/:id", middleware.RBACMiddleware(data.PERM_RequestDelete), h.Delete)
+		trips.Get("/", middleware.RBACMiddleware(data.PERM_BusinessTripRead), h.List)
+		trips.Get("/export", middleware.RBACMiddleware(data.PERM_BusinessTripExport), h.Export)
+		trips.Get("/:id", middleware.RBACMiddleware(data.PERM_BusinessTripRead), h.Detail)
+		trips.Post("/", middleware.RBACMiddleware(data.PERM_BusinessTripCreate), h.Create)
+		trips.Put("/:id", middleware.RBACMiddleware(data.PERM_BusinessTripApprove), h.UpdateStatus)
+		// trips.Delete("/:id", middleware.RBACMiddleware(data.PERM_BusinessTripDelete), h.Delete)
 	}
 }

@@ -19,7 +19,7 @@ func HolidayRoutes(app *fiber.App, db *gorm.DB) {
 	{
 		holidays.Get("/metadata", h.Metadata)
 		holidays.Get("/", middleware.RBACMiddleware(data.PERM_HolidayRead), h.List)
-		holidays.Get("/export", middleware.RBACMiddleware(data.PERM_HolidayRead), h.Export)
+		holidays.Get("/export", middleware.RBACMiddleware(data.PERM_HolidayExport), h.Export)
 		holidays.Get("/:id", middleware.RBACMiddleware(data.PERM_HolidayRead), h.Detail)
 		holidays.Post("/", middleware.RBACMiddleware(data.PERM_HolidayCreate), h.Create)
 		holidays.Put("/:id", middleware.RBACMiddleware(data.PERM_HolidayUpdate), h.Update)
