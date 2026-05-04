@@ -13,6 +13,7 @@ var AllowedSortColumns = map[string]map[string]string{
 		"attendance_date": "al.attendance_date",
 		"employee_name":   "e.full_name",
 		"employee_id":     "e.full_name",
+		"employee":        "e.full_name",
 		"status":          "al.status",
 		"clock_in_at":     "al.clock_in_at",
 		"clock_out_at":    "al.clock_out_at",
@@ -25,6 +26,7 @@ var AllowedSortColumns = map[string]map[string]string{
 	"attendance_override": {
 		"attendance_date": "al.attendance_date",
 		"employee_id":     "e1.full_name",
+		"employee":        "e1.full_name",
 		"department_id":   "d.name",
 		"override_type":   "ao.override_type",
 		"status":          "ao.status",

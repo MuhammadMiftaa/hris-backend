@@ -75,10 +75,6 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 	`
 	args := []interface{}{}
 
-	if params.EmployeeID != nil {
-		baseQuery += " AND b.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
 	if params.LeaveTypeID != nil {
 		baseQuery += " AND b.leave_type_id = ?"
 		args = append(args, *params.LeaveTypeID)
@@ -87,14 +83,23 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 		baseQuery += " AND e.department_id = ?"
 		args = append(args, *params.DepartmentID)
 	}
-	if params.Year != nil {
-		baseQuery += " AND b.year = ?"
-		args = append(args, *params.Year)
+	if params.Year != nil && *params.Year != "" {
+		baseQuery += " AND b.year::TEXT ILIKE ?"
+		like := "%" + *params.Year + "%"
+		args = append(args, like)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR t.name ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.UsedDuration != nil && *params.UsedDuration != "" {
+		baseQuery += " AND b.used_duration = ?"
+		args = append(args, *params.UsedDuration)
+	}
+	if params.MaxDuration != nil && *params.MaxDuration != "" {
+		baseQuery += " AND t.max_total_duration_per_year = ?"
+		args = append(args, *params.MaxDuration)
+	}
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND (e.full_name ILIKE ?)"
+		like := "%" + *params.EmployeeName + "%"
+		args = append(args, like)
 	}
 
 	var total int
@@ -120,7 +125,7 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 			b.created_at,
 			b.updated_at
 	` + baseQuery
-	
+
 	selectQuery += utils.BuildSortClause("leave_balances", params.SortBy, params.GetSortDir(), "b.created_at DESC")
 	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
@@ -225,10 +230,6 @@ func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, pa
 	`
 	args := []interface{}{}
 
-	if params.EmployeeID != nil {
-		baseQuery += " AND r.employee_id = ?"
-		args = append(args, *params.EmployeeID)
-	}
 	if params.DepartmentID != nil {
 		baseQuery += " AND e.department_id = ?"
 		args = append(args, *params.DepartmentID)
@@ -245,10 +246,19 @@ func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, pa
 		baseQuery += " AND EXTRACT(YEAR FROM r.start_date) = ?"
 		args = append(args, *params.Year)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR r.reason ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		like := "%" + *params.EmployeeName + "%"
+		args = append(args, like)
+	}
+	if params.TotalDays != nil && *params.TotalDays != "" {
+		baseQuery += " AND r.total_days::TEXT ILIKE ?"
+		like := "%" + *params.TotalDays + "%"
+		args = append(args, like)
+	}
+	if params.Reason != nil && *params.Reason != "" {
+		baseQuery += " AND r.reason ILIKE ?"
+		args = append(args, "%"+*params.Reason+"%")
 	}
 
 	var total int
@@ -275,7 +285,7 @@ func (r *leaveRepository) GetAllRequests(ctx context.Context, tx Transaction, pa
 			r.created_at,
 			r.updated_at
 	` + baseQuery
-	
+
 	selectQuery += utils.BuildSortClause("leave_requests", params.SortBy, params.GetSortDir(), "r.created_at DESC")
 	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 

@@ -82,10 +82,15 @@ func (r *permissionRequestRepository) GetAll(ctx context.Context, tx Transaction
 		baseQuery += " AND pr.date <= ?::DATE"
 		args = append(args, *params.EndDate)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.Reason != nil && *params.Reason != "" {
+		baseQuery += " AND pr.reason ILIKE ?"
+		like := "%" + *params.Reason + "%"
+		args = append(args, like)
+	}
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		like := "%" + *params.EmployeeName + "%"
+		args = append(args, like)
 	}
 
 	var total int

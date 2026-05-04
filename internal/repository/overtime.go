@@ -85,10 +85,15 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 		baseQuery += " AND o.work_location_type = ?"
 		args = append(args, *params.WorkLocationType)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR o.reason ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.Reason != nil && *params.Reason != "" {
+		baseQuery += " AND o.reason ILIKE ?"
+		like := "%" + *params.Reason + "%"
+		args = append(args, like)
+	}
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		like := "%" + *params.EmployeeName + "%"
+		args = append(args, like)
 	}
 
 	var total int
@@ -115,7 +120,7 @@ func (r *overtimeRepository) GetAll(ctx context.Context, tx Transaction, params 
 			o.created_at,
 			o.updated_at
 	` + baseQuery
-	
+
 	selectQuery += utils.BuildSortClause("overtime", params.SortBy, params.GetSortDir(), "o.created_at DESC")
 	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 

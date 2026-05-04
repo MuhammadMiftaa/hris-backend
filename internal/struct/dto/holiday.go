@@ -50,7 +50,7 @@ type HolidayListParams struct {
 	Year     *int    `query:"year"`
 	Type     *string `query:"type"`
 	BranchID *uint   `query:"branch_id"`
-	Search   *string `query:"search"`
+	Name     *string `query:"name"`
 	DateFrom *string `query:"date_from"`
 	DateTo   *string `query:"date_to"`
 }

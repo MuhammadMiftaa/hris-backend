@@ -170,6 +170,10 @@ func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction
 	`
 	args := []interface{}{}
 
+	if params.FullName != nil && *params.FullName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		args = append(args, "%"+*params.FullName+"%")
+	}
 	if params.BranchID != nil {
 		baseQuery += " AND e.branch_id = ?"
 		args = append(args, *params.BranchID)
@@ -185,11 +189,6 @@ func (r *employeeRepository) GetAllEmployees(ctx context.Context, tx Transaction
 	if params.JobPositionID != nil {
 		baseQuery += " AND e.job_positions_id = ?"
 		args = append(args, *params.JobPositionID)
-	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
 	}
 	if params.IsTrainer != nil {
 		baseQuery += " AND e.is_trainer = ?"

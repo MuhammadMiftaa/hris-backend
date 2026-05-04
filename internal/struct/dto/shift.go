@@ -72,7 +72,7 @@ type ShiftTemplateListParams struct {
 	PaginationParams
 	IsFlexible *bool   `query:"is_flexible"`
 	CanWFA     *bool   `query:"can_wfa"`
-	Search     *string `query:"search"`
+	Name       *string `query:"name"`
 }
 
 type CreateShiftDetailRequest struct {
@@ -123,7 +123,7 @@ type ScheduleListParams struct {
 	EmployeeID      *uint   `query:"employee_id"`
 	ShiftTemplateID *uint   `query:"shift_template_id"`
 	IsActive        *bool   `query:"is_active"`
-	Search          *string `query:"search"`
+	EmployeeName    *string `query:"employee_name"`
 	DateFrom        *string `query:"date_from"`
 	DateTo          *string `query:"date_to"`
 }

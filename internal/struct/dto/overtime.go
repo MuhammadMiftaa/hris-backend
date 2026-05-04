@@ -3,20 +3,20 @@ package dto
 import "time"
 
 type OvertimeRequestResponse struct {
-	ID               uint       `json:"id"`
-	EmployeeID       uint       `json:"employee_id"`
-	EmployeeName     *string    `json:"employee_name"`
-	DepartmentName   *string    `json:"department_name"`
-	AttendanceLogID  *uint      `json:"attendance_log_id"`
-	OvertimeDate     string     `json:"overtime_date"`
-	PlannedStart     *time.Time `json:"planned_start"`
-	PlannedEnd       *time.Time `json:"planned_end"`
-	ActualStart      *time.Time `json:"actual_start"`
-	ActualEnd        *time.Time `json:"actual_end"`
-	PlannedMinutes   int        `json:"planned_minutes"`
-	ActualMinutes    *int       `json:"actual_minutes"`
-	Reason           string     `json:"reason"`
-	WorkLocationType string     `json:"work_location_type"`
+	ID               uint                       `json:"id"`
+	EmployeeID       uint                       `json:"employee_id"`
+	EmployeeName     *string                    `json:"employee_name"`
+	DepartmentName   *string                    `json:"department_name"`
+	AttendanceLogID  *uint                      `json:"attendance_log_id"`
+	OvertimeDate     string                     `json:"overtime_date"`
+	PlannedStart     *time.Time                 `json:"planned_start"`
+	PlannedEnd       *time.Time                 `json:"planned_end"`
+	ActualStart      *time.Time                 `json:"actual_start"`
+	ActualEnd        *time.Time                 `json:"actual_end"`
+	PlannedMinutes   int                        `json:"planned_minutes"`
+	ActualMinutes    *int                       `json:"actual_minutes"`
+	Reason           string                     `json:"reason"`
+	WorkLocationType string                     `json:"work_location_type"`
 	Status           string                     `json:"status"`
 	Approvals        []OvertimeApprovalResponse `json:"approvals,omitempty" gorm:"-"`
 	CreatedAt        time.Time                  `json:"created_at"`
@@ -57,12 +57,13 @@ type RejectOvertimeRequest struct {
 
 type OvertimeListParams struct {
 	PaginationParams
-	EmployeeID *uint   `query:"employee_id"`
-	DepartmentID *uint `query:"department_id"`
-	Status     *string `query:"status"`
-	StartDate  *string `query:"start_date"`
-	EndDate    *string `query:"end_date"`
-	Search     *string `query:"search"`
+	EmployeeID       *uint   `query:"employee_id"`
+	EmployeeName     *string `query:"employee_name"`
+	DepartmentID     *uint   `query:"department_id"`
+	Status           *string `query:"status"`
+	StartDate        *string `query:"start_date"`
+	EndDate          *string `query:"end_date"`
+	Reason           *string `query:"reason"`
 	WorkLocationType *string `query:"work_location_type"`
 }
 

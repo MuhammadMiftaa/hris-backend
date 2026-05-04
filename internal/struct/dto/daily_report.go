@@ -35,5 +35,5 @@ type DailyReportListParams struct {
 	StartDate   *string `query:"start_date"`
 	EndDate     *string `query:"end_date"`
 	IsSubmitted *bool   `query:"is_submitted"`
-	Search      *string `query:"search"`
+	Activities  *string `query:"activities"`
 }

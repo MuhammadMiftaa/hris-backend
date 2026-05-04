@@ -74,10 +74,25 @@ func (r *businessTripRepository) GetAll(ctx context.Context, tx Transaction, par
 		baseQuery += " AND b.end_date <= ?::DATE"
 		args = append(args, *params.EndDate)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.Purpose != nil && *params.Purpose != "" {
+		baseQuery += " AND b.purpose ILIKE ?"
+		like := "%" + *params.Purpose + "%"
+		args = append(args, like)
+	}
+	if params.Destination != nil && *params.Destination != "" {
+		baseQuery += " AND b.destination ILIKE ?"
+		like := "%" + *params.Destination + "%"
+		args = append(args, like)
+	}
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		like := "%" + *params.EmployeeName + "%"
+		args = append(args, like)
+	}
+	if params.TotalDays != nil {
+		baseQuery += " AND b.total_days::TEXT LIKE ?"
+		like := "%" + *params.TotalDays + "%"
+		args = append(args, like)
 	}
 
 	var total int

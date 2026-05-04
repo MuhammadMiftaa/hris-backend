@@ -68,12 +68,12 @@ type UpdateEmployeeRequest struct {
 
 type EmployeeListParams struct {
 	PaginationParams
-	BranchID       *uint   `query:"branch_id"`
-	DepartmentID   *uint   `query:"department_id"`
-	JobPositionID  *uint   `query:"job_positions_id"`
-	IsActive       *bool   `query:"is_active"`
-	IsTrainer      *bool   `query:"is_trainer"`
-	Search         *string `query:"search"`
+	FullName      *string `query:"full_name"`
+	BranchID      *uint   `query:"branch_id"`
+	DepartmentID  *uint   `query:"department_id"`
+	JobPositionID *uint   `query:"job_positions_id"`
+	IsActive      *bool   `query:"is_active"`
+	IsTrainer     *bool   `query:"is_trainer"`
 }
 
 type EmployeeMetadata struct {

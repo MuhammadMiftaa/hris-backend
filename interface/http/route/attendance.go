@@ -53,6 +53,6 @@ func AttendanceRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
 		overrides.Get("/:id", middleware.RBACMiddleware(data.PERM_AttendanceAdjustmentRead), h.DetailOverride)
 		overrides.Post("/", middleware.RBACMiddleware(data.PERM_AttendanceAdjustmentCreate), h.CreateOverride)
 		overrides.Put("/:id", middleware.RBACMiddleware(data.PERM_AttendanceAdjustmentApprove), h.UpdateOverride)
-		overrides.Get("/export", middleware.RBACMiddleware(data.PERM_AttendanceAdjustmentExport), h.ExportOverride)
+		// overrides.Get("/export", middleware.RBACMiddleware(data.PERM_AttendanceAdjustmentExport), h.ExportOverride)
 	}
 }

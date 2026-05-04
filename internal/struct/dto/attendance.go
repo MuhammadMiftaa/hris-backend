@@ -89,14 +89,13 @@ type ShiftDayContext struct {
 
 type AttendanceListParams struct {
 	PaginationParams
-	EmployeeID   *uint   `query:"employee_id"`
+	Employee     *string `query:"employee"`
 	DepartmentID *uint   `query:"department_id"`
 	StartDate    *string `query:"start_date"`
 	EndDate      *string `query:"end_date"`
 	Status       *string `query:"status"`
 	BranchID     *uint   `query:"branch_id"`
 	Method       *string `query:"clock_in_method"` // selfie, qr_code, manual
-	Search       *string `query:"search"`           // search by employee_name, employee_number
 }
 
 type MutabaahSubmitRequest struct {
@@ -133,12 +132,13 @@ type MutabaahTodayResponse struct {
 type MutabaahListParams struct {
 	PaginationParams
 	EmployeeID   *uint   `query:"employee_id"`
+	EmployeeName *string `query:"employee_name"`
 	DepartmentID *uint   `query:"department_id"`
 	BranchID     *uint   `query:"branch_id"`
 	StartDate    *string `query:"start_date"`
 	EndDate      *string `query:"end_date"`
 	IsSubmitted  *bool   `query:"is_submitted"`
-	Search       *string `query:"search"`
+	TargetPages  *string `query:"target_pages"`
 }
 
 type MutabaahDailyReport struct {

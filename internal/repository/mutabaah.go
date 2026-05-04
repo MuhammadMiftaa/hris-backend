@@ -120,10 +120,14 @@ func (r *mutabaahRepository) GetAllLogs(ctx context.Context, tx Transaction, par
 		baseQuery += " AND ml.is_submitted = ?"
 		args = append(args, *params.IsSubmitted)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		like := "%" + *params.EmployeeName + "%"
+		args = append(args, like)
+	}
+	if params.TargetPages != nil && *params.TargetPages != "" {
+		baseQuery += " AND (CASE WHEN e.is_trainer THEN 10 ELSE 5 END) = ?"
+		args = append(args, *params.TargetPages)
 	}
 
 	var total int

@@ -73,9 +73,9 @@ func (r *shiftRepository) GetAllShiftTemplates(ctx context.Context, tx Transacti
 	`
 	args := []interface{}{}
 
-	if params.Search != nil && *params.Search != "" {
+	if params.Name != nil && *params.Name != "" {
 		baseQuery += " AND name ILIKE ?"
-		args = append(args, "%"+*params.Search+"%")
+		args = append(args, "%"+*params.Name+"%")
 	}
 	if params.IsFlexible != nil {
 		baseQuery += " AND is_flexible = ?"
@@ -309,10 +309,9 @@ func (r *shiftRepository) GetAllSchedules(ctx context.Context, tx Transaction, p
 		baseQuery += " AND es.is_active = ?"
 		args = append(args, *params.IsActive)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ? OR st.name ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like, like)
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		args = append(args, "%"+*params.EmployeeName+"%")
 	}
 	if params.DateFrom != nil && *params.DateFrom != "" {
 		baseQuery += " AND es.effective_date >= ?::DATE"

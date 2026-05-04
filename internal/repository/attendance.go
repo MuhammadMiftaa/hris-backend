@@ -197,18 +197,14 @@ func (r *attendanceRepository) GetAllLogs(ctx context.Context, tx Transaction, p
 	`
 	args := []interface{}{}
 
-	if params.EmployeeID != nil {
-		baseQuery += " AND al.employee_id = ?"
-		args = append(args, *params.EmployeeID)
+	if params.Employee != nil && *params.Employee != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		like := "%" + *params.Employee + "%"
+		args = append(args, like)
 	}
 	if params.DepartmentID != nil {
 		baseQuery += " AND e.department_id = ?"
 		args = append(args, *params.DepartmentID)
-	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR e.employee_number ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
 	}
 	if params.StartDate != nil {
 		baseQuery += " AND al.attendance_date >= ?"
@@ -266,7 +262,7 @@ func (r *attendanceRepository) GetAllLogs(ctx context.Context, tx Transaction, p
 			al.created_at,
 			al.updated_at
 		` + baseQuery
-	
+
 	selectQuery += utils.BuildSortClause("attendance", params.SortBy, params.GetSortDir(), "al.attendance_date DESC")
 	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
@@ -330,7 +326,7 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 		ClockOutStart   *string `db:"clock_out_start"`
 		ClockOutEnd     *string `db:"clock_out_end"`
 	}
- 
+
 	err = db.Raw(`
 		SELECT
 			es.id                              AS schedule_id,
@@ -603,9 +599,10 @@ func (r *attendanceRepository) GetAllOverrides(ctx context.Context, tx Transacti
 	`
 	args := []interface{}{}
 
-	if params.EmployeeID != nil {
-		baseQuery += " AND ao.requested_by = ?"
-		args = append(args, *params.EmployeeID)
+	if params.Employee != nil && *params.Employee != "" {
+		baseQuery += " AND e1.full_name ILIKE ?"
+		like := "%" + *params.Employee + "%"
+		args = append(args, like)
 	}
 	if params.Status != nil && *params.Status != "" {
 		baseQuery += " AND ao.status = ?"
@@ -614,11 +611,6 @@ func (r *attendanceRepository) GetAllOverrides(ctx context.Context, tx Transacti
 	if params.DepartmentID != nil {
 		baseQuery += " AND e1.department_id = ?"
 		args = append(args, *params.DepartmentID)
-	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e1.full_name ILIKE ? OR e1.employee_number ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
 	}
 	if params.StartDate != nil && *params.StartDate != "" {
 		baseQuery += " AND al.attendance_date >= ?::DATE"

@@ -40,12 +40,13 @@ type UpdatePermissionStatusRequest struct {
 type PermissionListParams struct {
 	PaginationParams
 	EmployeeID     *uint   `query:"employee_id"`
+	EmployeeName   *string `query:"employee_name"`
 	DepartmentID   *uint   `query:"department_id"`
 	Status         *string `query:"status"`
 	PermissionType *string `query:"permission_type"`
 	StartDate      *string `query:"start_date"`
 	EndDate        *string `query:"end_date"`
-	Search         *string `query:"search"`
+	Reason         *string `query:"reason"`
 }
 
 type RequestMetadata struct {

@@ -68,10 +68,9 @@ func (r *holidayRepository) GetAllHolidays(ctx context.Context, tx Transaction, 
 			baseQuery += " AND h.branch_id = ?"
 			args = append(args, *params.BranchID)
 		}
-		if params.Search != nil && *params.Search != "" {
-			baseQuery += " AND (h.name ILIKE ? OR h.description ILIKE ?)"
-			like := "%" + *params.Search + "%"
-			args = append(args, like, like)
+		if params.Name != nil && *params.Name != "" {
+			baseQuery += " AND h.name ILIKE ?"
+			args = append(args, "%"+*params.Name+"%")
 		}
 		if params.DateFrom != nil && *params.DateFrom != "" {
 			baseQuery += " AND h.date >= ?::DATE"
@@ -228,12 +227,12 @@ func (r *holidayRepository) GetBranchMetadata(ctx context.Context, tx Transactio
 }
 
 func (r *holidayRepository) GetHolidayByDateAndBranch(ctx context.Context, tx Transaction, date string, branchID *uint) (*dto.HolidayResponse, error) {
-    db, err := r.getDB(ctx, tx)
-    if err != nil {
-        return nil, err
-    }
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
 
-    query := `
+	query := `
         SELECT h.id, h.name, h.year, h.date::TEXT AS date, h.type::TEXT AS type,
                h.branch_id, b.name AS branch_name, h.description,
                h.created_at, h.updated_at, h.deleted_at
@@ -241,60 +240,60 @@ func (r *holidayRepository) GetHolidayByDateAndBranch(ctx context.Context, tx Tr
         LEFT JOIN branches b ON b.id = h.branch_id AND b.deleted_at IS NULL
         WHERE h.date = ?::DATE AND h.deleted_at IS NULL
     `
-    args := []interface{}{date}
+	args := []interface{}{date}
 
-    if branchID == nil {
-        query += " AND h.branch_id IS NULL"
-    } else {
-        query += " AND h.branch_id = ?"
-        args = append(args, *branchID)
-    }
-    query += " LIMIT 1"
+	if branchID == nil {
+		query += " AND h.branch_id IS NULL"
+	} else {
+		query += " AND h.branch_id = ?"
+		args = append(args, *branchID)
+	}
+	query += " LIMIT 1"
 
-    var res dto.HolidayResponse
-    if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
-        return nil, err
-    }
-    if res.ID == 0 {
-        return nil, nil
-    }
-    return &res, nil
+	var res dto.HolidayResponse
+	if err := db.Raw(query, args...).Scan(&res).Error; err != nil {
+		return nil, err
+	}
+	if res.ID == 0 {
+		return nil, nil
+	}
+	return &res, nil
 }
 
 func (r *holidayRepository) UpsertHolidays(ctx context.Context, tx Transaction, holidays []model.Holiday) (int, int, error) {
-    if len(holidays) == 0 {
-        return 0, 0, nil
-    }
-    db, err := r.getDB(ctx, tx)
-    if err != nil {
-        return 0, 0, err
-    }
+	if len(holidays) == 0 {
+		return 0, 0, nil
+	}
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return 0, 0, err
+	}
 
-    synced, skipped := 0, 0
-    for _, h := range holidays {
-        date := h.Date.Format("2006-01-02")
+	synced, skipped := 0, 0
+	for _, h := range holidays {
+		date := h.Date.Format("2006-01-02")
 
-        // Cek apakah sudah ada
-        existing, err := r.GetHolidayByDateAndBranch(ctx, tx, date, h.BranchID)
-        if err != nil {
-            return synced, skipped, err
-        }
+		// Cek apakah sudah ada
+		existing, err := r.GetHolidayByDateAndBranch(ctx, tx, date, h.BranchID)
+		if err != nil {
+			return synced, skipped, err
+		}
 
-        if existing != nil {
-            // Update name & type jika sudah ada
-            if err := db.Model(&model.Holiday{}).Where("id = ?", existing.ID).Updates(map[string]interface{}{
-                "name": h.Name,
-                "type": h.Type,
-            }).Error; err != nil {
-                return synced, skipped, err
-            }
-            skipped++
-        } else {
-            if err := db.Create(&h).Error; err != nil {
-                return synced, skipped, err
-            }
-            synced++
-        }
-    }
-    return synced, skipped, nil
+		if existing != nil {
+			// Update name & type jika sudah ada
+			if err := db.Model(&model.Holiday{}).Where("id = ?", existing.ID).Updates(map[string]interface{}{
+				"name": h.Name,
+				"type": h.Type,
+			}).Error; err != nil {
+				return synced, skipped, err
+			}
+			skipped++
+		} else {
+			if err := db.Create(&h).Error; err != nil {
+				return synced, skipped, err
+			}
+			synced++
+		}
+	}
+	return synced, skipped, nil
 }

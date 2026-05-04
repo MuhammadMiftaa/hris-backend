@@ -17,10 +17,9 @@ type UpdateOverrideStatusRequest struct {
 
 type OverrideListParams struct {
 	PaginationParams
-	EmployeeID   *uint   `query:"employee_id"`
+	Employee     *string `query:"employee"`
 	Status       *string `query:"status"`
 	DepartmentID *uint   `query:"department_id"`
-	Search       *string `query:"search"`
 	StartDate    *string `query:"start_date"`
 	EndDate      *string `query:"end_date"`
 	OverrideType *string `query:"override_type"`

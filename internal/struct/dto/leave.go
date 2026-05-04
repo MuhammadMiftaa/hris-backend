@@ -21,24 +21,24 @@ type LeaveBalanceResponse struct {
 }
 
 type LeaveRequestResponse struct {
-	ID            uint                    `json:"id"`
-	EmployeeID    uint                    `json:"employee_id"`
-	EmployeeName  *string                 `json:"employee_name"`
-	LeaveTypeID   uint                    `json:"leave_type_id"`
-	LeaveTypeName *string                 `json:"leave_type_name"`
-	DepartmentName *string                `json:"department_name"`
-	LeaveCategory *string                 `json:"leave_category"`
-	StartDate     string                  `json:"start_date"`
-	EndDate       string                  `json:"end_date"`
-	TotalDays     int                     `json:"total_days"`
-	TotalHours    *int                    `json:"total_hours"`
-	Reason        *string                 `json:"reason"`
-	DocumentURL   *string                 `json:"document_url"`
-	Status        string                  `json:"status"`
-	Approvals     []LeaveApprovalResponse `json:"approvals,omitempty" gorm:"-"`
-	CreatedAt     time.Time               `json:"created_at"`
-	UpdatedAt     *time.Time              `json:"updated_at"`
-	DeletedAt     *time.Time              `json:"deleted_at"`
+	ID             uint                    `json:"id"`
+	EmployeeID     uint                    `json:"employee_id"`
+	EmployeeName   *string                 `json:"employee_name"`
+	LeaveTypeID    uint                    `json:"leave_type_id"`
+	LeaveTypeName  *string                 `json:"leave_type_name"`
+	DepartmentName *string                 `json:"department_name"`
+	LeaveCategory  *string                 `json:"leave_category"`
+	StartDate      string                  `json:"start_date"`
+	EndDate        string                  `json:"end_date"`
+	TotalDays      int                     `json:"total_days"`
+	TotalHours     *int                    `json:"total_hours"`
+	Reason         *string                 `json:"reason"`
+	DocumentURL    *string                 `json:"document_url"`
+	Status         string                  `json:"status"`
+	Approvals      []LeaveApprovalResponse `json:"approvals,omitempty" gorm:"-"`
+	CreatedAt      time.Time               `json:"created_at"`
+	UpdatedAt      *time.Time              `json:"updated_at"`
+	DeletedAt      *time.Time              `json:"deleted_at"`
 }
 
 type LeaveApprovalResponse struct {
@@ -75,8 +75,10 @@ type RejectLeaveRequest struct {
 type LeaveBalanceListParams struct {
 	PaginationParams
 	EmployeeID   *uint   `query:"employee_id"`
-	Year         *int    `query:"year"`
-	Search       *string `query:"search"`
+	Year         *string `query:"year"`
+	UsedDuration *string `query:"used_duration"`
+	MaxDuration  *string `query:"max_duration"`
+	EmployeeName *string `query:"employee_name"`
 	DepartmentID *uint   `query:"department_id"`
 	LeaveTypeID  *uint   `query:"leave_type_id"`
 }
@@ -84,13 +86,15 @@ type LeaveBalanceListParams struct {
 type LeaveRequestListParams struct {
 	PaginationParams
 	EmployeeID   *uint   `query:"employee_id"`
+	EmployeeName *string `query:"employee_name"`
 	DepartmentID *uint   `query:"department_id"`
 	Status       *string `query:"status"`
 	LeaveTypeID  *uint   `query:"leave_type_id"`
 	Year         *int    `query:"year"`
-	Search       *string `query:"search"`
 	StartDate    *string `query:"start_date"`
 	EndDate      *string `query:"end_date"`
+	TotalDays    *string `query:"total_days"`
+	Reason       *string `query:"reason"`
 }
 
 type LeaveMetadata struct {

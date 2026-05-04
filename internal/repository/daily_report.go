@@ -74,10 +74,10 @@ func (r *dailyReportRepository) GetAll(ctx context.Context, tx Transaction, para
 		baseQuery += " AND d.is_submitted = ?"
 		args = append(args, *params.IsSubmitted)
 	}
-	if params.Search != nil && *params.Search != "" {
-		baseQuery += " AND (e.full_name ILIKE ? OR d.activities ILIKE ?)"
-		like := "%" + *params.Search + "%"
-		args = append(args, like, like)
+	if params.Activities != nil && *params.Activities != "" {
+		baseQuery += " AND d.activities ILIKE ?"
+		like := "%" + *params.Activities + "%"
+		args = append(args, like)
 	}
 
 	var total int

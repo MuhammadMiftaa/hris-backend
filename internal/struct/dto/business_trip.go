@@ -39,10 +39,13 @@ type UpdateBusinessTripStatusRequest struct {
 
 type BusinessTripListParams struct {
 	PaginationParams
-	EmployeeID *uint   `query:"employee_id"`
-	DepartmentID *uint `query:"department_id"`
-	Status     *string `query:"status"`
-	StartDate  *string `query:"start_date"`
-	EndDate    *string `query:"end_date"`
-	Search     *string `query:"search"`
+	EmployeeID     *uint   `query:"employee_id"`
+	EmployeeName   *string `query:"employee_name"`
+	DepartmentID   *uint `query:"department_id"`
+	Status         *string `query:"status"`
+	StartDate      *string `query:"start_date"`
+	EndDate        *string `query:"end_date"`
+	Purpose        *string `query:"purpose"`
+	Destination    *string `query:"destination"`
+	TotalDays      *string    `query:"total_days"`
 }
