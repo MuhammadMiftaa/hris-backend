@@ -14,15 +14,15 @@ type DashboardRepository interface {
 	GetTodayAttendanceStatus(ctx context.Context, employeeID uint, date string) (dto.TodayAttendanceStatus, error)
 	GetMonthlyAttendanceSummary(ctx context.Context, employeeID uint, year int, month int) (dto.AttendanceSummaryDTO, error)
 	GetLeaveBalanceSummary(ctx context.Context, employeeID uint, year int) ([]dto.LeaveBalanceSummaryDTO, error)
-	GetPendingRequests(ctx context.Context, employeeID uint) ([]dto.PendingRequestDTO, error)
+	GetEmployeeRequests(ctx context.Context, employeeID uint) ([]dto.EmployeeRequestDTO, error)
 	GetApprovalQueue(ctx context.Context, approverID uint) ([]dto.ApprovalQueueItemDTO, error)
 	GetApprovalCounts(ctx context.Context, approverID uint) (dto.ApprovalCountsDTO, error)
 	GetTeamAttendanceSummary(ctx context.Context, date string) (dto.TeamAttendanceSummaryDTO, error)
 	GetTeamMutabaahSummary(ctx context.Context, date string) (dto.TeamMutabaahSummaryDTO, error)
 	GetNotClockedIn(ctx context.Context, date string) ([]dto.NotClockedInDTO, error)
 	GetExpiringContracts(ctx context.Context, days int) ([]dto.ExpiringContractDTO, error)
-	GetFastestArrivalRanking(ctx context.Context, year int, month int, limit int) ([]dto.RankingEntryDTO, error)
-	GetTopTilawahByDepartment(ctx context.Context, year int, month int, limit int) ([]dto.DepartmentRankingDTO, error)
+	GetFastestArrivalRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error)
+	GetTopTilawahByDepartment(ctx context.Context, date string, limit int) ([]dto.DepartmentRankingDTO, error)
 	GetFastestMutabaahRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error)
 	GetRecentAttendanceMeta(ctx context.Context, employeeID uint) ([]dto.Meta, error)
 	GetLeaveTypeMeta(ctx context.Context) ([]dto.Meta, error)
@@ -113,28 +113,34 @@ func (r *dashboardRepository) GetLeaveBalanceSummary(ctx context.Context, employ
 	return summary, err
 }
 
-func (r *dashboardRepository) GetPendingRequests(ctx context.Context, employeeID uint) ([]dto.PendingRequestDTO, error) {
-	var requests []dto.PendingRequestDTO
+func (r *dashboardRepository) GetEmployeeRequests(ctx context.Context, employeeID uint) ([]dto.EmployeeRequestDTO, error) {
+	var requests []dto.EmployeeRequestDTO
 	err := r.getDB(ctx).Raw(`
 		SELECT id, 'leave'              AS type, 'Cuti'          AS label, created_at::TEXT, status::TEXT AS status
 		FROM leave_requests
-		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
+		WHERE employee_id = ? AND deleted_at IS NULL
+		  AND (end_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
 		SELECT id, 'permission'         AS type, 'Izin'          AS label, created_at::TEXT, status::TEXT AS status
 		FROM permission_requests
-		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
+		WHERE employee_id = ? AND deleted_at IS NULL
+		  AND (date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
 		SELECT id, 'overtime'           AS type, 'Lembur'        AS label, created_at::TEXT, status::TEXT AS status
 		FROM overtime_requests
-		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
+		WHERE employee_id = ? AND deleted_at IS NULL
+		  AND (overtime_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
-		SELECT id, 'business_trip'      AS type, 'Dinas Luar'    AS label, created_at::TEXT, status::TEXT AS status
+		SELECT id, 'business_trip'      AS type, 'Tugas'    AS label, created_at::TEXT, status::TEXT AS status
 		FROM business_trip_requests
-		WHERE employee_id = ? AND status = 'pending' AND deleted_at IS NULL
+		WHERE employee_id = ? AND deleted_at IS NULL
+		  AND (end_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
-		SELECT id, 'attendance_override' AS type, 'Koreksi Absen' AS label, created_at::TEXT, status::TEXT AS status
-		FROM attendance_overrides
-		WHERE requested_by = ? AND status = 'pending' AND deleted_at IS NULL
+		SELECT ao.id, 'attendance_override' AS type, 'Koreksi Absen' AS label, ao.created_at::TEXT, ao.status::TEXT AS status
+		FROM attendance_overrides ao
+		JOIN attendance_logs al ON al.id = ao.attendance_log_id AND al.deleted_at IS NULL
+		WHERE ao.requested_by = ? AND ao.deleted_at IS NULL
+		  AND (al.attendance_date >= CURRENT_DATE OR ao.created_at::DATE = CURRENT_DATE)
 		ORDER BY created_at DESC
 		LIMIT 10
 	`, employeeID, employeeID, employeeID, employeeID, employeeID).Scan(&requests).Error
@@ -159,7 +165,7 @@ func (r *dashboardRepository) GetApprovalQueue(ctx context.Context, approverID u
 		JOIN employees e ON e.id = o.employee_id
 		WHERE o.status = 'pending' AND o.deleted_at IS NULL
 		UNION ALL
-		SELECT b.id, 'business_trip' AS type, e.full_name AS employee_name, 'Dinas Luar'   AS label, b.created_at::TEXT
+		SELECT b.id, 'business_trip' AS type, e.full_name AS employee_name, 'Tugas'   AS label, b.created_at::TEXT
 		FROM business_trip_requests b
 		JOIN employees e ON e.id = b.employee_id
 		WHERE b.status = 'pending' AND b.deleted_at IS NULL
@@ -320,7 +326,7 @@ func (r *dashboardRepository) GetExpiringContracts(ctx context.Context, days int
 	return list, err
 }
 
-func (r *dashboardRepository) GetFastestArrivalRanking(ctx context.Context, year int, month int, limit int) ([]dto.RankingEntryDTO, error) {
+func (r *dashboardRepository) GetFastestArrivalRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error) {
 	var list []dto.RankingEntryDTO
 	query := `
 		WITH RankedArrivals AS (
@@ -328,7 +334,8 @@ func (r *dashboardRepository) GetFastestArrivalRanking(ctx context.Context, year
 				al.employee_id,
 				e.full_name,
 				e.employee_number,
-				AVG(EXTRACT(EPOCH FROM (al.clock_in_at::time - COALESCE(std.clock_in_end, '08:00:00')::time)) / 60.0) AS avg_diff
+				al.clock_in_at,
+				EXTRACT(EPOCH FROM (al.clock_in_at::time - COALESCE(std.clock_in_end, '08:00:00')::time)) / 60.0 AS diff_minutes
 			FROM attendance_logs al
 			JOIN employees e ON e.id = al.employee_id
 			LEFT JOIN employee_schedules es
@@ -341,77 +348,90 @@ func (r *dashboardRepository) GetFastestArrivalRanking(ctx context.Context, year
 				ON std.shift_template_id = st.id
 				AND std.day_of_week = LOWER(TRIM(TO_CHAR(al.attendance_date, 'Day')))::day_of_week_enum
 				AND std.is_working_day = TRUE
-			WHERE EXTRACT(YEAR FROM al.attendance_date) = ?
-			  AND EXTRACT(MONTH FROM al.attendance_date) = ?
+			WHERE al.attendance_date = ?::DATE
 			  AND al.status IN ('present', 'late')
 			  AND al.deleted_at IS NULL
-			GROUP BY al.employee_id, e.full_name, e.employee_number
 		)
 		SELECT
-			RANK() OVER (ORDER BY avg_diff ASC) AS rank,
+			RANK() OVER (ORDER BY diff_minutes ASC) AS rank,
 			employee_id,
 			full_name AS employee_name,
 			employee_number,
-			ROUND(avg_diff::numeric, 0) AS value,
-			ROUND(avg_diff::numeric, 0) || 'm' AS value_label
+			ROUND(diff_minutes::numeric, 0) AS value,
+			TO_CHAR(clock_in_at, 'HH24:MI') AS value_label
 		FROM RankedArrivals
-		WHERE avg_diff < 0
-		ORDER BY avg_diff ASC
+		WHERE diff_minutes < 0
+		ORDER BY diff_minutes ASC
 		LIMIT ?
 	`
-	err := r.getDB(ctx).Raw(query, year, month, limit).Scan(&list).Error
+	err := r.getDB(ctx).Raw(query, date, limit).Scan(&list).Error
 	return list, err
 }
 
-func (r *dashboardRepository) GetTopTilawahByDepartment(ctx context.Context, year int, month int, limit int) ([]dto.DepartmentRankingDTO, error) {
+func (r *dashboardRepository) GetTopTilawahByDepartment(ctx context.Context, date string, limit int) ([]dto.DepartmentRankingDTO, error) {
 	var list []dto.DepartmentRankingDTO
 	query := `
-		WITH DeptTilawah AS (
+		WITH EligibleEmployees AS (
+			SELECT DISTINCT e.id AS employee_id, e.department_id
+			FROM employees e
+			JOIN accounts a ON a.employee_id = e.id AND a.deleted_at IS NULL
+			JOIN role_permissions rp ON rp.role_id = a.role_id AND rp.permission_code = 'mutabaah-create'
+			WHERE e.deleted_at IS NULL AND e.department_id IS NOT NULL
+		),
+		DeptTilawah AS (
 			SELECT
 				d.id AS department_id,
 				d.name AS department_name,
-				COUNT(ml.id) AS total_logs,
-				COUNT(ml.id) FILTER (WHERE ml.is_submitted = TRUE) AS submitted_logs
-			FROM mutabaah_logs ml
-			JOIN employees e ON e.id = ml.employee_id
-			JOIN departments d ON d.id = e.department_id
-			WHERE EXTRACT(YEAR FROM ml.log_date) = ?
-			  AND EXTRACT(MONTH FROM ml.log_date) = ?
-			  AND ml.deleted_at IS NULL
+				COUNT(ee.employee_id) AS total_eligible,
+				COUNT(ml.id) FILTER (WHERE ml.is_submitted = TRUE) AS submitted_count
+			FROM EligibleEmployees ee
+			JOIN departments d ON d.id = ee.department_id AND d.deleted_at IS NULL
+			LEFT JOIN mutabaah_logs ml ON ml.employee_id = ee.employee_id
+				AND ml.log_date = ?::DATE
+				AND ml.deleted_at IS NULL
 			GROUP BY d.id, d.name
-			HAVING COUNT(ml.id) > 0
+			HAVING COUNT(ee.employee_id) > 0
 		)
 		SELECT
-			RANK() OVER (ORDER BY (submitted_logs::float / total_logs) DESC) AS rank,
+			RANK() OVER (ORDER BY (submitted_count::float / total_eligible) DESC) AS rank,
 			department_id,
 			department_name,
-			ROUND((submitted_logs::numeric / total_logs) * 100, 1) AS value,
-			ROUND((submitted_logs::numeric / total_logs) * 100, 1) || '%' AS value_label
+			ROUND((submitted_count::numeric / total_eligible) * 100, 1) AS value,
+			ROUND((submitted_count::numeric / total_eligible) * 100, 1) || '%' AS value_label
 		FROM DeptTilawah
 		ORDER BY value DESC
 		LIMIT ?
 	`
-	err := r.getDB(ctx).Raw(query, year, month, limit).Scan(&list).Error
+	err := r.getDB(ctx).Raw(query, date, limit).Scan(&list).Error
 	return list, err
 }
 
 func (r *dashboardRepository) GetFastestMutabaahRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error) {
 	var list []dto.RankingEntryDTO
 	query := `
+		WITH RankedMutabaah AS (
+			SELECT
+				ml.employee_id,
+				e.full_name AS employee_name,
+				e.employee_number,
+				EXTRACT(EPOCH FROM (ml.submitted_at - al.clock_in_at)) / 60.0 AS value,
+				TO_CHAR(ml.submitted_at, 'HH24:MI') AS value_label
+			FROM mutabaah_logs ml
+			JOIN employees e ON e.id = ml.employee_id
+			JOIN attendance_logs al ON al.id = ml.attendance_log_id AND al.deleted_at IS NULL
+			WHERE ml.log_date = ?::DATE
+			  AND ml.is_submitted = TRUE
+			  AND ml.deleted_at IS NULL
+		)
 		SELECT
-			RANK() OVER (ORDER BY ml.submitted_at ASC) AS rank,
-			ml.employee_id,
-			e.full_name AS employee_name,
-			e.employee_number,
-			EXTRACT(EPOCH FROM (ml.submitted_at - al.clock_in_at)) / 60.0 AS value,
-			TO_CHAR(ml.submitted_at, 'HH24:MI') AS value_label
-		FROM mutabaah_logs ml
-		JOIN employees e ON e.id = ml.employee_id
-		JOIN attendance_logs al ON al.id = ml.attendance_log_id AND al.deleted_at IS NULL
-		WHERE ml.log_date = ?::DATE
-		  AND ml.is_submitted = TRUE
-		  AND ml.deleted_at IS NULL
-		ORDER BY ml.submitted_at ASC
+			RANK() OVER (ORDER BY value ASC) AS rank,
+			employee_id,
+			employee_name,
+			employee_number,
+			value,
+			value_label
+		FROM RankedMutabaah
+		ORDER BY value ASC
 		LIMIT ?
 	`
 	err := r.getDB(ctx).Raw(query, date, limit).Scan(&list).Error

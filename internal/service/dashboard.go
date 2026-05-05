@@ -52,22 +52,22 @@ func (s *dashboardService) GetEmployeeDashboard(ctx context.Context, employeeID 
 	// 4. Leave balances
 	leaveBalances, _ := s.dashboardRepo.GetLeaveBalanceSummary(ctx, employeeID, year)
 
-	// 5. Pending requests
-	pendingRequests, _ := s.dashboardRepo.GetPendingRequests(ctx, employeeID)
+	// 5. Employee requests (upcoming or created today)
+	employeeRequests, _ := s.dashboardRepo.GetEmployeeRequests(ctx, employeeID)
 
 	if leaveBalances == nil {
 		leaveBalances = []dto.LeaveBalanceSummaryDTO{}
 	}
-	if pendingRequests == nil {
-		pendingRequests = []dto.PendingRequestDTO{}
+	if employeeRequests == nil {
+		employeeRequests = []dto.EmployeeRequestDTO{}
 	}
 
 	return dto.EmployeeDashboardResponse{
-		Today:           todayStatus,
-		MutabaahToday:   mutabaahTodayStatus,
-		MonthlySummary:  monthlySummary,
-		LeaveBalances:   leaveBalances,
-		PendingRequests: pendingRequests,
+		Today:            todayStatus,
+		MutabaahToday:    mutabaahTodayStatus,
+		MonthlySummary:   monthlySummary,
+		LeaveBalances:    leaveBalances,
+		EmployeeRequests: employeeRequests,
 	}, nil
 }
 
@@ -152,14 +152,12 @@ func (s *dashboardService) GetHRDDashboard(ctx context.Context, hrID uint) (dto.
 
 func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankingsResponse, error) {
 	today := utils.TodayDate()
-	now := time.Now()
-	year, month, _ := now.Date()
 
-	fastest, err := s.dashboardRepo.GetFastestArrivalRanking(ctx, year, int(month), 5)
+	fastest, err := s.dashboardRepo.GetFastestArrivalRanking(ctx, today, 5)
 	if err != nil {
 		log.Printf("[WARN] GetFastestArrivalRanking failed: %v", err)
 	}
-	tilawah, err := s.dashboardRepo.GetTopTilawahByDepartment(ctx, year, int(month), 5)
+	tilawah, err := s.dashboardRepo.GetTopTilawahByDepartment(ctx, today, 5)
 	if err != nil {
 		log.Printf("[WARN] GetTopTilawahByDepartment failed: %v", err)
 	}

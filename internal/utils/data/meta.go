@@ -192,7 +192,7 @@ var (
 		{ID: "absent", Name: "Absen"},
 		{ID: "half_day", Name: "Setengah Hari"},
 		{ID: "leave", Name: "Cuti"},
-		{ID: "business_trip", Name: "Dinas Luar"},
+		{ID: "business_trip", Name: "Tugas"},
 		{ID: "holiday", Name: "Libur"},
 	}
 

@@ -35,7 +35,7 @@ type LeaveBalanceSummaryDTO struct {
 	Remaining     *int   `json:"remaining"`
 }
 
-type PendingRequestDTO struct {
+type EmployeeRequestDTO struct {
 	ID        uint   `json:"id"`
 	Type      string `json:"type"`
 	Label     string `json:"label"`
@@ -48,7 +48,7 @@ type EmployeeDashboardResponse struct {
 	MutabaahToday   *MutabaahTodayStatus     `json:"mutabaah_today"`
 	MonthlySummary  AttendanceSummaryDTO     `json:"monthly_summary"`
 	LeaveBalances   []LeaveBalanceSummaryDTO `json:"leave_balances"`
-	PendingRequests []PendingRequestDTO      `json:"pending_requests"`
+	EmployeeRequests []EmployeeRequestDTO     `json:"employee_requests"`
 }
 
 type ApprovalQueueItemDTO struct {
