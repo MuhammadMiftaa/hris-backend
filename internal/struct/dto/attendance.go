@@ -141,6 +141,25 @@ type MutabaahListParams struct {
 	TargetPages  *string `query:"target_pages"`
 }
 
+type MutabaahDailyReportParams struct {
+	PaginationParams
+	StartDate      string  `query:"start_date"`
+	EndDate        string  `query:"end_date"`
+	EmployeeName   *string `query:"employee_name"`
+	DepartmentName *string `query:"department_name"`
+	IsTrainer      *string `query:"is_trainer"`
+	Status         *string `query:"status"`
+}
+
+type MutabaahMonthlyReportParams struct {
+	PaginationParams
+	Month          int     `query:"month"`
+	Year           int     `query:"year"`
+	EmployeeName   *string `query:"employee_name"`
+	DepartmentName *string `query:"department_name"`
+	IsTrainer      *string `query:"is_trainer"`
+}
+
 type MutabaahDailyReport struct {
 	EmployeeID     uint    `json:"employee_id"`
 	EmployeeName   string  `json:"employee_name"`

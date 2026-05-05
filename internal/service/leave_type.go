@@ -12,7 +12,7 @@ import (
 
 type LeaveTypeService interface {
 	GetMetadata(ctx context.Context) dto.LeaveTypeMetadata
-	GetAllLeaveTypes(ctx context.Context) ([]dto.LeaveTypeResponse, error)
+	GetAllLeaveTypes(ctx context.Context, params dto.LeaveTypeListParams) (dto.PaginatedResponse[dto.LeaveTypeResponse], error)
 	GetLeaveTypeByID(ctx context.Context, id string) (dto.LeaveTypeResponse, error)
 	CreateLeaveType(ctx context.Context, req dto.CreateLeaveTypeRequest) (dto.LeaveTypeResponse, error)
 	UpdateLeaveType(ctx context.Context, id string, req dto.UpdateLeaveTypeRequest) (dto.LeaveTypeResponse, error)
@@ -34,12 +34,12 @@ func (s *leaveTypeService) GetMetadata(ctx context.Context) dto.LeaveTypeMetadat
 	}
 }
 
-func (s *leaveTypeService) GetAllLeaveTypes(ctx context.Context) ([]dto.LeaveTypeResponse, error) {
-	leaveTypes, err := s.repo.GetAllLeaveTypes(ctx)
+func (s *leaveTypeService) GetAllLeaveTypes(ctx context.Context, params dto.LeaveTypeListParams) (dto.PaginatedResponse[dto.LeaveTypeResponse], error) {
+	result, err := s.repo.GetAllLeaveTypes(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("get all leave types: %w", err)
+		return dto.PaginatedResponse[dto.LeaveTypeResponse]{}, fmt.Errorf("get all leave types: %w", err)
 	}
-	return leaveTypes, nil
+	return result, nil
 }
 
 func (s *leaveTypeService) GetLeaveTypeByID(ctx context.Context, id string) (dto.LeaveTypeResponse, error) {

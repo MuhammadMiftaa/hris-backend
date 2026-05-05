@@ -22,8 +22,8 @@ type MutabaahRepository interface {
 	}, error)
 	GetByID(ctx context.Context, tx Transaction, id uint) (*dto.MutabaahLogResponse, error)
 	BulkCreateMissingLogs(ctx context.Context, tx Transaction, logs []model.MutabaahLog) error
-	GetDailyReport(ctx context.Context, tx Transaction, startDate, endDate string) ([]dto.MutabaahDailyReport, error)
-	GetMonthlyReport(ctx context.Context, tx Transaction, month, year int) ([]dto.MutabaahMonthlySummary, error)
+	GetDailyReport(ctx context.Context, tx Transaction, params dto.MutabaahDailyReportParams) (dto.PaginatedResponse[dto.MutabaahDailyReport], error)
+	GetMonthlyReport(ctx context.Context, tx Transaction, params dto.MutabaahMonthlyReportParams) (dto.PaginatedResponse[dto.MutabaahMonthlySummary], error)
 	GetCategoryReport(ctx context.Context, tx Transaction, date string) ([]dto.MutabaahCategorySummary, error)
 }
 
@@ -273,35 +273,46 @@ func (r *mutabaahRepository) BulkCreateMissingLogs(ctx context.Context, tx Trans
 	return db.Create(&logs).Error
 }
 
-func (r *mutabaahRepository) GetDailyReport(ctx context.Context, tx Transaction, startDate, endDate string) ([]dto.MutabaahDailyReport, error) {
+func (r *mutabaahRepository) GetDailyReport(ctx context.Context, tx Transaction, params dto.MutabaahDailyReportParams) (dto.PaginatedResponse[dto.MutabaahDailyReport], error) {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
-		return nil, err
+		return dto.PaginatedResponse[dto.MutabaahDailyReport]{}, err
 	}
 
-	// When start_date == end_date, this is a single-day report (original behaviour).
-	// When they differ, we aggregate across the date range.
-	var results []dto.MutabaahDailyReport
-	query := `
-		WITH date_range AS (
-			SELECT generate_series(?::DATE, ?::DATE, '1 day'::INTERVAL)::DATE AS dt
-		)
-		SELECT
-			e.id AS employee_id,
-			e.full_name AS employee_name,
-			e.employee_number,
-			d.name AS department_name,
-			e.is_trainer,
-			dr.dt::TEXT AS log_date,
-			CASE 
-				WHEN e.is_trainer THEN 10
-				ELSE 5
-			END AS target_pages,
-			COALESCE(ml.is_submitted, false) AS is_submitted,
-			ml.submitted_at::TEXT AS submitted_at
+	startDate := params.StartDate
+	endDate := params.EndDate
+
+	// Build WHERE clause for filters
+	filterClause := ""
+	filterArgs := []interface{}{}
+
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		filterClause += " AND e.full_name ILIKE ?"
+		filterArgs = append(filterArgs, "%"+*params.EmployeeName+"%")
+	}
+	if params.DepartmentName != nil && *params.DepartmentName != "" {
+		filterClause += " AND d.name = ?"
+		filterArgs = append(filterArgs, *params.DepartmentName)
+	}
+	if params.IsTrainer != nil && *params.IsTrainer != "" {
+		if *params.IsTrainer == "true" {
+			filterClause += " AND e.is_trainer = TRUE"
+		} else if *params.IsTrainer == "false" {
+			filterClause += " AND e.is_trainer = FALSE"
+		}
+	}
+	if params.Status != nil && *params.Status != "" {
+		if *params.Status == "submitted" {
+			filterClause += " AND COALESCE(ml.is_submitted, false) = TRUE"
+		} else if *params.Status == "not_submitted" {
+			filterClause += " AND COALESCE(ml.is_submitted, false) = FALSE"
+		}
+	}
+
+	baseQuery := `
 		FROM employees e
 		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
-		CROSS JOIN date_range dr
+		CROSS JOIN (SELECT generate_series(?::DATE, ?::DATE, '1 day'::INTERVAL)::DATE AS dt) dr
 		INNER JOIN employee_schedules es
 			ON es.employee_id = e.id
 			AND es.is_active = TRUE
@@ -316,20 +327,88 @@ func (r *mutabaahRepository) GetDailyReport(ctx context.Context, tx Transaction,
 			AND std.deleted_at IS NULL
 		LEFT JOIN mutabaah_logs ml ON ml.employee_id = e.id AND ml.log_date = dr.dt AND ml.deleted_at IS NULL
 		WHERE e.deleted_at IS NULL
-		ORDER BY e.full_name ASC, dr.dt ASC
-	`
-	err = db.Raw(query, startDate, endDate).Scan(&results).Error
-	return results, err
-}
+	` + filterClause
 
-func (r *mutabaahRepository) GetMonthlyReport(ctx context.Context, tx Transaction, month, year int) ([]dto.MutabaahMonthlySummary, error) {
-	db, err := r.getDB(ctx, tx)
-	if err != nil {
-		return nil, err
+	baseArgs := []interface{}{startDate, endDate}
+	baseArgs = append(baseArgs, filterArgs...)
+
+	// Count
+	var total int
+	if err := db.Raw("SELECT COUNT(*) "+baseQuery, baseArgs...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.MutabaahDailyReport]{}, err
 	}
 
-	var results []dto.MutabaahMonthlySummary
-	query := `
+	selectQuery := `
+		SELECT
+			e.id AS employee_id,
+			e.full_name AS employee_name,
+			e.employee_number,
+			d.name AS department_name,
+			e.is_trainer,
+			dr.dt::TEXT AS log_date,
+			CASE 
+				WHEN e.is_trainer THEN 10
+				ELSE 5
+			END AS target_pages,
+			COALESCE(ml.is_submitted, false) AS is_submitted,
+			ml.submitted_at::TEXT AS submitted_at
+	` + baseQuery
+
+	selectQuery += utils.BuildSortClause("mutabaah_daily", params.SortBy, params.GetSortDir(), "e.full_name ASC, dr.dt ASC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var results []dto.MutabaahDailyReport
+	if err = db.Raw(selectQuery, baseArgs...).Scan(&results).Error; err != nil {
+		return dto.PaginatedResponse[dto.MutabaahDailyReport]{}, err
+	}
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.MutabaahDailyReport]{
+		Data: results,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
+}
+
+func (r *mutabaahRepository) GetMonthlyReport(ctx context.Context, tx Transaction, params dto.MutabaahMonthlyReportParams) (dto.PaginatedResponse[dto.MutabaahMonthlySummary], error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return dto.PaginatedResponse[dto.MutabaahMonthlySummary]{}, err
+	}
+
+	month := params.Month
+	year := params.Year
+
+	// Build filter clause
+	filterClause := ""
+	var filterArgs []interface{}
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		filterClause += " AND e.full_name ILIKE ?"
+		filterArgs = append(filterArgs, "%"+*params.EmployeeName+"%")
+	}
+	if params.DepartmentName != nil && *params.DepartmentName != "" {
+		filterClause += " AND d.name = ?"
+		filterArgs = append(filterArgs, *params.DepartmentName)
+	}
+	if params.IsTrainer != nil && *params.IsTrainer != "" {
+		if *params.IsTrainer == "true" {
+			filterClause += " AND e.is_trainer = TRUE"
+		} else if *params.IsTrainer == "false" {
+			filterClause += " AND e.is_trainer = FALSE"
+		}
+	}
+
+	// This query uses CTEs so we wrap pagination around it
+	innerQuery := `
 		WITH month_dates AS (
 			SELECT generate_series(
 				DATE_TRUNC('month', MAKE_DATE(?, ?, 1)),
@@ -375,11 +454,45 @@ func (r *mutabaahRepository) GetMonthlyReport(ctx context.Context, tx Transactio
 			AND al.deleted_at IS NULL
 		LEFT JOIN mutabaah_logs ml ON ml.attendance_log_id = al.id AND ml.deleted_at IS NULL
 		WHERE e.deleted_at IS NULL
+	` + filterClause + `
 		GROUP BY e.id, e.full_name, d.name, e.is_trainer, ewd.total_working_days
-		ORDER BY compliance_percentage DESC, e.full_name ASC
 	`
-	err = db.Raw(query, year, month, year, month, month, year).Scan(&results).Error
-	return results, err
+
+	args := []interface{}{year, month, year, month, month, year}
+	args = append(args, filterArgs...)
+
+	// Count using subquery
+	var total int
+	countQuery := "SELECT COUNT(*) FROM (" + innerQuery + ") sub"
+	if err := db.Raw(countQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.MutabaahMonthlySummary]{}, err
+	}
+
+	// Add sort and pagination
+	fullQuery := innerQuery
+	fullQuery += utils.BuildSortClause("mutabaah_monthly", params.SortBy, params.GetSortDir(), "compliance_percentage DESC, e.full_name ASC")
+	fullQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var results []dto.MutabaahMonthlySummary
+	if err = db.Raw(fullQuery, args...).Scan(&results).Error; err != nil {
+		return dto.PaginatedResponse[dto.MutabaahMonthlySummary]{}, err
+	}
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.MutabaahMonthlySummary]{
+		Data: results,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
 }
 
 func (r *mutabaahRepository) GetCategoryReport(ctx context.Context, tx Transaction, date string) ([]dto.MutabaahCategorySummary, error) {

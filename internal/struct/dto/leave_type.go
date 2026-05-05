@@ -1,8 +1,9 @@
 package dto
 
 import (
-	"hris-backend/internal/struct/model"
 	"time"
+
+	"hris-backend/internal/struct/model"
 )
 
 type LeaveTypeResponse struct {
@@ -51,5 +52,9 @@ type LeaveTypeMetadata struct {
 
 type LeaveTypeListParams struct {
 	PaginationParams
-	Search *string `query:"search"`
+	MaxTotalDurationPerYear *string `query:"max_total_duration_per_year"`
+	MaxDurationPerRequest   *string `query:"max_duration_per_request"`
+	Name                    *string `query:"name"`
+	Category                *string `query:"category"`
+	RequiresDocument        *bool   `query:"requires_document"`
 }

@@ -398,3 +398,141 @@ func (h *AttendanceHandler) exportPDF(c *fiber.Ctx, logs []dto.AttendanceLogResp
 	c.Set("Content-Disposition", "attachment; filename=presensi.pdf")
 	return c.Send(pdf)
 }
+
+// ExportOverride — GET /attendance-overrides/export?format=csv|pdf
+func (h *AttendanceHandler) ExportOverride(c *fiber.Ctx) error {
+	var params dto.OverrideListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	// Override pagination: ambil semua data yang match filter
+	allPerPage := 0
+	params.PerPage = &allPerPage
+
+	result, err := h.service.GetAllOverrides(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		return h.exportCSVOverrides(c, result.Data)
+	case dto.ExportPDF:
+		return h.exportPDFOverrides(c, result.Data)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
+}
+
+func (h *AttendanceHandler) exportCSVOverrides(c *fiber.Ctx, overrides []dto.AttendanceOverrideResponse) error {
+	headers := []string{"Tanggal", "Pegawai", "Departemen", "Tipe Koreksi",
+		"Jam Masuk Original", "Jam Masuk Koreksi", "Jam Keluar Original", "Jam Keluar Koreksi",
+		"Alasan", "Status"}
+	var rows [][]string
+	for _, ov := range overrides {
+		attDate := "-"
+		if ov.AttendanceDate != nil {
+			attDate = *ov.AttendanceDate
+		}
+		reqName := "-"
+		if ov.RequesterName != nil {
+			reqName = *ov.RequesterName
+		}
+		deptName := "-"
+		if ov.DepartmentName != nil {
+			deptName = *ov.DepartmentName
+		}
+		origIn := "-"
+		if ov.OriginalClockIn != nil {
+			origIn = ov.OriginalClockIn.Format("15:04")
+		}
+		corrIn := "-"
+		if ov.CorrectedClockIn != nil {
+			corrIn = ov.CorrectedClockIn.Format("15:04")
+		}
+		origOut := "-"
+		if ov.OriginalClockOut != nil {
+			origOut = ov.OriginalClockOut.Format("15:04")
+		}
+		corrOut := "-"
+		if ov.CorrectedClockOut != nil {
+			corrOut = ov.CorrectedClockOut.Format("15:04")
+		}
+
+		rows = append(rows, []string{
+			attDate, reqName, deptName, ov.OverrideType,
+			origIn, corrIn, origOut, corrOut,
+			ov.Reason, ov.Status,
+		})
+	}
+	data, err := utils.WriteCSV(headers, rows)
+	if err != nil {
+		return respondError(c, err)
+	}
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", "attachment; filename=koreksi-presensi.csv")
+	return c.Send(data)
+}
+
+func (h *AttendanceHandler) exportPDFOverrides(c *fiber.Ctx, overrides []dto.AttendanceOverrideResponse) error {
+	headers := []string{"Tanggal", "Pegawai", "Departemen", "Tipe",
+		"Masuk Lama", "Masuk Baru", "Keluar Lama", "Keluar Baru",
+		"Alasan", "Status"}
+	var rows [][]string
+	for _, ov := range overrides {
+		attDate := "-"
+		if ov.AttendanceDate != nil {
+			attDate = *ov.AttendanceDate
+		}
+		reqName := "-"
+		if ov.RequesterName != nil {
+			reqName = *ov.RequesterName
+		}
+		deptName := "-"
+		if ov.DepartmentName != nil {
+			deptName = *ov.DepartmentName
+		}
+		origIn := "-"
+		if ov.OriginalClockIn != nil {
+			origIn = ov.OriginalClockIn.Format("15:04")
+		}
+		corrIn := "-"
+		if ov.CorrectedClockIn != nil {
+			corrIn = ov.CorrectedClockIn.Format("15:04")
+		}
+		origOut := "-"
+		if ov.OriginalClockOut != nil {
+			origOut = ov.OriginalClockOut.Format("15:04")
+		}
+		corrOut := "-"
+		if ov.CorrectedClockOut != nil {
+			corrOut = ov.CorrectedClockOut.Format("15:04")
+		}
+
+		rows = append(rows, []string{
+			attDate, reqName, deptName, ov.OverrideType,
+			origIn, corrIn, origOut, corrOut,
+			ov.Reason, ov.Status,
+		})
+	}
+	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+		Title: "Laporan Koreksi Presensi", Date: time.Now().Format("02 Jan 2006"),
+		Headers: headers, Rows: rows, TotalData: len(overrides),
+	})
+	if err != nil {
+		return respondError(c, err)
+	}
+	pdf, err := utils.GeneratePDF(html)
+	if err != nil {
+		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename=koreksi-presensi.pdf")
+	return c.Send(pdf)
+}

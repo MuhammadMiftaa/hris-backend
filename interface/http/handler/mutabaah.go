@@ -201,13 +201,21 @@ func (h *MutabaahHandler) HRDCancel(c *fiber.Ctx) error {
 }
 
 func (h *MutabaahHandler) GetDailyReport(c *fiber.Ctx) error {
-	startDate := c.Query("start_date", c.Query("date"))
-	endDate := c.Query("end_date", startDate)
-	if startDate == "" {
+	var params dto.MutabaahDailyReportParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+	if params.StartDate == "" {
+		params.StartDate = c.Query("date")
+	}
+	if params.EndDate == "" {
+		params.EndDate = params.StartDate
+	}
+	if params.StartDate == "" {
 		return respondBadRequest(c, "query start_date atau date wajib diisi (format YYYY-MM-DD)")
 	}
 
-	result, err := h.service.GetDailyReport(c.Context(), startDate, endDate)
+	result, err := h.service.GetDailyReport(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -220,13 +228,15 @@ func (h *MutabaahHandler) GetDailyReport(c *fiber.Ctx) error {
 }
 
 func (h *MutabaahHandler) GetMonthlyReport(c *fiber.Ctx) error {
-	month := c.QueryInt("month")
-	year := c.QueryInt("year")
-	if month <= 0 || month > 12 || year <= 0 {
+	var params dto.MutabaahMonthlyReportParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+	if params.Month <= 0 || params.Month > 12 || params.Year <= 0 {
 		return respondBadRequest(c, "query month dan year wajib diisi dan valid")
 	}
 
-	result, err := h.service.GetMonthlyReport(c.Context(), month, year)
+	result, err := h.service.GetMonthlyReport(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -266,10 +276,19 @@ func (h *MutabaahHandler) ExportDailyReport(c *fiber.Ctx) error {
 	}
 	format := c.Query("format", "csv")
 
-	result, err := h.service.GetDailyReport(c.Context(), startDate, endDate)
+	// Export gets all data (no pagination)
+	allPerPage := 0
+	params := dto.MutabaahDailyReportParams{
+		StartDate: startDate,
+		EndDate:   endDate,
+	}
+	params.PerPage = &allPerPage
+
+	resultPaged, err := h.service.GetDailyReport(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
+	result := resultPaged.Data
 
 	headers := []string{"Nama", "NIP", "Departemen", "Kategori", "Target (hlm)", "Status", "Waktu Submit"}
 	var rows [][]string
@@ -332,10 +351,19 @@ func (h *MutabaahHandler) ExportMonthlyReport(c *fiber.Ctx) error {
 	}
 	format := c.Query("format", "csv")
 
-	result, err := h.service.GetMonthlyReport(c.Context(), month, year)
+	// Export gets all data (no pagination)
+	allPerPage := 0
+	params := dto.MutabaahMonthlyReportParams{
+		Month: month,
+		Year:  year,
+	}
+	params.PerPage = &allPerPage
+
+	resultPaged, err := h.service.GetMonthlyReport(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}
+	result := resultPaged.Data
 
 	headers := []string{"Nama", "Departemen", "Kategori", "Hari Wajib", "Hari Submit", "% Kepatuhan"}
 	var rows [][]string

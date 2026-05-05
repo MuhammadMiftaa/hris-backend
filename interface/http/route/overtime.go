@@ -20,6 +20,7 @@ func OvertimeRoutes(app *fiber.App, db *gorm.DB) {
 
 	ots := app.Group("/overtime-requests")
 	{
+		ots.Get("/metadata", h.Metadata)
 		ots.Get("/", middleware.RBACMiddleware(data.PERM_OvertimeRead), h.List)
 		ots.Get("/export", middleware.RBACMiddleware(data.PERM_OvertimeExport), h.Export)
 		ots.Get("/:id", middleware.RBACMiddleware(data.PERM_OvertimeRead), h.Detail)

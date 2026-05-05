@@ -27,7 +27,12 @@ func (h *LeaveTypeHandler) Metadata(c *fiber.Ctx) error {
 }
 
 func (h *LeaveTypeHandler) List(c *fiber.Ctx) error {
-	result, err := h.service.GetAllLeaveTypes(c.Context())
+	var params dto.LeaveTypeListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	result, err := h.service.GetAllLeaveTypes(c.Context(), params)
 	if err != nil {
 		return respondError(c, err)
 	}

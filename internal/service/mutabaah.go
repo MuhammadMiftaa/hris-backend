@@ -16,8 +16,8 @@ type MutabaahService interface {
 	Cancel(ctx context.Context, employeeID uint, req dto.MutabaahCancelRequest) (dto.MutabaahLogResponse, error)
 	GetAllLogs(ctx context.Context, params dto.MutabaahListParams) (dto.PaginatedResponse[dto.MutabaahLogResponse], error)
 	HRDCancel(ctx context.Context, id uint) (dto.MutabaahLogResponse, error)
-	GetDailyReport(ctx context.Context, startDate, endDate string) ([]dto.MutabaahDailyReport, error)
-	GetMonthlyReport(ctx context.Context, month, year int) ([]dto.MutabaahMonthlySummary, error)
+	GetDailyReport(ctx context.Context, params dto.MutabaahDailyReportParams) (dto.PaginatedResponse[dto.MutabaahDailyReport], error)
+	GetMonthlyReport(ctx context.Context, params dto.MutabaahMonthlyReportParams) (dto.PaginatedResponse[dto.MutabaahMonthlySummary], error)
 	GetCategoryReport(ctx context.Context, date string) ([]dto.MutabaahCategorySummary, error)
 }
 
@@ -207,12 +207,12 @@ func (s *mutabaahService) HRDCancel(ctx context.Context, id uint) (dto.MutabaahL
 	return *result, nil
 }
 
-func (s *mutabaahService) GetDailyReport(ctx context.Context, startDate, endDate string) ([]dto.MutabaahDailyReport, error) {
-	return s.repo.GetDailyReport(ctx, nil, startDate, endDate)
+func (s *mutabaahService) GetDailyReport(ctx context.Context, params dto.MutabaahDailyReportParams) (dto.PaginatedResponse[dto.MutabaahDailyReport], error) {
+	return s.repo.GetDailyReport(ctx, nil, params)
 }
 
-func (s *mutabaahService) GetMonthlyReport(ctx context.Context, month, year int) ([]dto.MutabaahMonthlySummary, error) {
-	return s.repo.GetMonthlyReport(ctx, nil, month, year)
+func (s *mutabaahService) GetMonthlyReport(ctx context.Context, params dto.MutabaahMonthlyReportParams) (dto.PaginatedResponse[dto.MutabaahMonthlySummary], error) {
+	return s.repo.GetMonthlyReport(ctx, nil, params)
 }
 
 func (s *mutabaahService) GetCategoryReport(ctx context.Context, date string) ([]dto.MutabaahCategorySummary, error) {

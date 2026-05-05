@@ -19,6 +19,20 @@ func NewOvertimeHandler(service service.OvertimeService) *OvertimeHandler {
 	return &OvertimeHandler{service: service}
 }
 
+func (h *OvertimeHandler) Metadata(c *fiber.Ctx) error {
+	res, err := h.service.GetMetadata(c.Context())
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "overtime metadata",
+		Data:       res,
+	})
+}
+
+
 // List — GET /overtime-requests
 func (h *OvertimeHandler) List(c *fiber.Ctx) error {
 	var params dto.OvertimeListParams
