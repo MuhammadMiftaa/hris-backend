@@ -61,4 +61,5 @@ type AttendanceMetadata struct {
 	EmployeeMeta     []Meta `json:"employee_meta"`
 	BranchMeta       []Meta `json:"branch_meta"`
 	DepartmentMeta   []Meta `json:"department_meta"`
+	AttendanceMeta   []Meta `json:"attendance_meta"`
 }

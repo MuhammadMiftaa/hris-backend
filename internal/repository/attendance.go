@@ -66,6 +66,7 @@ type AttendanceRepository interface {
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetBranchMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetAttendanceMeta(ctx context.Context, tx Transaction, employeeID *uint) ([]dto.Meta, error)
 
 	GetEmployeeRoleLevel(ctx context.Context, tx Transaction, employeeID uint) (string, error)
 }
@@ -781,6 +782,59 @@ func (r *attendanceRepository) GetDepartmentMetaList(ctx context.Context, tx Tra
 		WHERE deleted_at IS NULL
 		ORDER BY name ASC
 	`).Scan(&meta).Error
+	return meta, err
+}
+
+func (r *attendanceRepository) GetAttendanceMeta(ctx context.Context, tx Transaction, employeeID *uint) ([]dto.Meta, error) {
+	var meta []dto.Meta
+	var query string
+	var args []interface{}
+
+	if employeeID != nil {
+		query = `
+			SELECT 
+				id::TEXT AS id,
+				TO_CHAR(attendance_date, 'DD Month YYYY') || 
+					CASE 
+						WHEN clock_in_at IS NOT NULL AND clock_out_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || TO_CHAR(clock_out_at, 'FMHH24:MI') || ')'
+						WHEN clock_in_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || CHR(63) || ')'
+						ELSE '' 
+					END AS name
+			FROM attendance_logs
+			WHERE employee_id = ? AND deleted_at IS NULL
+			ORDER BY attendance_date DESC
+			LIMIT 7
+		`
+		args = []interface{}{*employeeID}
+	} else {
+		query = `
+			SELECT 
+				al.id::TEXT AS id,
+				TO_CHAR(al.attendance_date, 'DD Month YYYY') || ' | ' || e.full_name || 
+					CASE 
+						WHEN al.clock_in_at IS NOT NULL AND al.clock_out_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(al.clock_in_at, 'FMHH24:MI') || ' - ' || TO_CHAR(al.clock_out_at, 'FMHH24:MI') || ')'
+						WHEN al.clock_in_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(al.clock_in_at, 'FMHH24:MI') || ' - ' || CHR(63) || ')'
+						ELSE '' 
+					END AS name
+			FROM attendance_logs al
+			JOIN employees e ON e.id = al.employee_id
+			WHERE al.deleted_at IS NULL
+			ORDER BY al.attendance_date DESC
+			LIMIT 7
+		`
+		args = []interface{}{}
+	}
+
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Raw(query, args...).Scan(&meta).Error
 	return meta, err
 }
 

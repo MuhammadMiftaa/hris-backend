@@ -31,7 +31,15 @@ func (s *departmentService) GetMetadata(ctx context.Context) (dto.DepartmentMeta
 	if err != nil {
 		return dto.DepartmentMetadata{}, fmt.Errorf("get branch metadata: %w", err)
 	}
-	return dto.DepartmentMetadata{BranchMeta: branchMeta}, nil
+	positionMeta, err := s.repo.GetPositionMetadata(ctx)
+	if err != nil {
+		return dto.DepartmentMetadata{}, fmt.Errorf("get position metadata: %w", err)
+	}
+	employeeMeta, err := s.repo.GetEmployeeMetadata(ctx)
+	if err != nil {
+		return dto.DepartmentMetadata{}, fmt.Errorf("get employee metadata: %w", err)
+	}
+	return dto.DepartmentMetadata{BranchMeta: branchMeta, PositionMeta: positionMeta, EmployeeMeta: employeeMeta}, nil
 }
 
 func (s *departmentService) GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) (dto.PaginatedResponse[dto.DepartmentResponse], error) {

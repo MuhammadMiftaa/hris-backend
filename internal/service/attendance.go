@@ -20,7 +20,7 @@ type AttendanceService interface {
 	ClockIn(ctx context.Context, employeeID uint, req dto.ClockInRequest) (dto.AttendanceLogResponse, error)
 	ClockOut(ctx context.Context, employeeID uint, req dto.ClockOutRequest) (dto.AttendanceLogResponse, error)
 	GetAllLogs(ctx context.Context, roleLevel string, params dto.AttendanceListParams) (dto.PaginatedResponse[dto.AttendanceLogResponse], error)
-	GetMetadata(ctx context.Context) (dto.AttendanceMetadata, error)
+	GetMetadata(ctx context.Context, employeeID *uint) (dto.AttendanceMetadata, error)
 	CreateManualAttendance(ctx context.Context, employeeID uint, req dto.CreateManualAttendanceRequest) (dto.AttendanceLogResponse, error)
 	GetAllOverrides(ctx context.Context, params dto.OverrideListParams) (dto.PaginatedResponse[dto.AttendanceOverrideResponse], error)
 	GetOverrideByID(ctx context.Context, id uint) (dto.AttendanceOverrideResponse, error)
@@ -516,7 +516,7 @@ func (s *attendanceService) GetAllLogs(ctx context.Context, roleLevel string, pa
 	return logs, nil
 }
 
-func (s *attendanceService) GetMetadata(ctx context.Context) (dto.AttendanceMetadata, error) {
+func (s *attendanceService) GetMetadata(ctx context.Context, employeeID *uint) (dto.AttendanceMetadata, error) {
 	empMeta, err := s.repo.GetEmployeeMetaList(ctx, nil)
 	if err != nil {
 		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch employee meta: %w", err)
@@ -532,10 +532,16 @@ func (s *attendanceService) GetMetadata(ctx context.Context) (dto.AttendanceMeta
 		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch department meta: %w", err)
 	}
 
+	attendanceMeta, err := s.repo.GetAttendanceMeta(ctx, nil, employeeID)
+	if err != nil {
+		return dto.AttendanceMetadata{}, fmt.Errorf("failed to fetch attendance meta: %w", err)
+	}
+
 	return dto.AttendanceMetadata{
 		StatusMeta:       data.AttendanceStatusMeta,
 		ClockMethodMeta:  data.ClockMethodMeta,
 		OverrideTypeMeta: data.OverrideTypeMeta,
+		AttendanceMeta:   attendanceMeta,
 		EmployeeMeta:     empMeta,
 		BranchMeta:       branchMeta,
 		DepartmentMeta:   deptMeta,

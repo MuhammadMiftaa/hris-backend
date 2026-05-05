@@ -63,7 +63,9 @@ type ScheduleResponse struct {
 // ── Metadata ───────────────────────────────────────────
 
 type ShiftMetadata struct {
-	DayOfWeekMeta []Meta `json:"day_of_week_meta"`
+	EmployeeMeta      []Meta `json:"employee_meta"`
+	ShiftTemplateMeta []Meta `json:"shift_template_meta"`
+	DayOfWeekMeta     []Meta `json:"day_of_week_meta"`
 }
 
 // ── Requests ───────────────────────────────────────────

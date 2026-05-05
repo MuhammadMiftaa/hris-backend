@@ -6,6 +6,7 @@ import (
 
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/struct/model"
 	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
@@ -161,7 +162,12 @@ func (h *AttendanceHandler) List(c *fiber.Ctx) error {
 
 // Metadata — GET /attendance/metadata
 func (h *AttendanceHandler) Metadata(c *fiber.Ctx) error {
-	res, err := h.service.GetMetadata(c.Context())
+	account := getAccountFromCtx(c)
+	var employeeID *uint
+	if account.RoleLevel == string(model.RoleLevelManager) || account.RoleLevel == string(model.RoleLevelStaff) {
+		employeeID = &account.EmployeeID
+	}
+	res, err := h.service.GetMetadata(c.Context(), employeeID)
 	if err != nil {
 		return respondError(c, err)
 	}

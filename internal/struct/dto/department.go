@@ -36,5 +36,7 @@ type DepartmentListParams struct {
 }
 
 type DepartmentMetadata struct {
-	BranchMeta []Meta `json:"branch_meta"`
+	BranchMeta   []Meta `json:"branch_meta"`
+	PositionMeta []Meta `json:"position_meta"`
+	EmployeeMeta []Meta `json:"employee_meta"`
 }

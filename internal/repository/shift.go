@@ -14,6 +14,9 @@ import (
 )
 
 type ShiftRepository interface {
+	GetEmployeeMetadata(ctx context.Context) ([]dto.Meta, error)
+	GetShiftTemplatesMetadata(ctx context.Context) ([]dto.Meta, error)
+
 	// Template
 	GetAllShiftTemplates(ctx context.Context, tx Transaction, params dto.ShiftTemplateListParams) (dto.PaginatedResponse[dto.ShiftTemplateResponse], error)
 	GetShiftTemplateByID(ctx context.Context, tx Transaction, id uint) (dto.ShiftTemplateResponse, error)
@@ -57,6 +60,32 @@ func (r *shiftRepository) getDB(ctx context.Context, tx Transaction) (*gorm.DB, 
 		return gormTx.db.WithContext(ctx), nil
 	}
 	return r.db.WithContext(ctx), nil
+}
+
+func (r *shiftRepository) GetEmployeeMetadata(ctx context.Context) ([]dto.Meta, error) {
+	var meta []dto.Meta
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT id, full_name AS name, job_positions_id AS parent_id
+		FROM employees
+		WHERE deleted_at IS NULL
+		ORDER BY full_name ASC
+	`).Scan(&meta).Error; err != nil {
+		return nil, err
+	}
+	return meta, nil
+}
+
+func (r *shiftRepository) GetShiftTemplatesMetadata(ctx context.Context) ([]dto.Meta, error) {
+	var meta []dto.Meta
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT id, name
+		FROM shift_templates
+		WHERE deleted_at IS NULL
+		ORDER BY name ASC
+	`).Scan(&meta).Error; err != nil {
+		return nil, err
+	}
+	return meta, nil
 }
 
 // ── Template ──────────────────────────────────────────

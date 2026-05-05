@@ -42,8 +42,18 @@ func NewShiftService(repo repository.ShiftRepository, txManager repository.TxMan
 }
 
 func (s *shiftService) GetMetadata(ctx context.Context) (dto.ShiftMetadata, error) {
+	employeeMeta, err := s.repo.GetEmployeeMetadata(ctx)
+	if err != nil {
+		return dto.ShiftMetadata{}, fmt.Errorf("get employee metadata: %w", err)
+	}
+	templateShiftMeta, err := s.repo.GetShiftTemplatesMetadata(ctx)
+	if err != nil {
+		return dto.ShiftMetadata{}, fmt.Errorf("get all shift templates: %w", err)
+	}
 	return dto.ShiftMetadata{
-		DayOfWeekMeta: data.DayOfWeekMeta,
+		EmployeeMeta:      employeeMeta,
+		ShiftTemplateMeta: templateShiftMeta,
+		DayOfWeekMeta:     data.DayOfWeekMeta,
 	}, nil
 }
 

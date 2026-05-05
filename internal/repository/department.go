@@ -13,6 +13,8 @@ import (
 
 type DepartmentRepository interface {
 	GetBranchMetadata(ctx context.Context) ([]dto.Meta, error)
+	GetPositionMetadata(ctx context.Context) ([]dto.Meta, error)
+	GetEmployeeMetadata(ctx context.Context) ([]dto.Meta, error)
 	GetAllDepartments(ctx context.Context, params dto.DepartmentListParams) (dto.PaginatedResponse[dto.DepartmentResponse], error)
 	GetDepartmentByID(ctx context.Context, id string) (dto.DepartmentResponse, error)
 	CreateDepartment(ctx context.Context, req model.Department) (model.Department, error)
@@ -35,6 +37,32 @@ func (r *departmentRepository) GetBranchMetadata(ctx context.Context) ([]dto.Met
 		FROM branches
 		WHERE deleted_at IS NULL
 		ORDER BY name ASC
+	`).Scan(&meta).Error; err != nil {
+		return nil, err
+	}
+	return meta, nil
+}
+
+func (r *departmentRepository) GetPositionMetadata(ctx context.Context) ([]dto.Meta, error) {
+	var meta []dto.Meta
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT id::TEXT AS id, title AS name, department_id AS parent_id
+		FROM job_positions
+		WHERE deleted_at IS NULL
+		ORDER BY title ASC
+	`).Scan(&meta).Error; err != nil {
+		return nil, err
+	}
+	return meta, nil
+}
+
+func (r *departmentRepository) GetEmployeeMetadata(ctx context.Context) ([]dto.Meta, error) {
+	var meta []dto.Meta
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT employee_number AS id, full_name AS name, job_positions_id AS parent_id
+		FROM employees
+		WHERE deleted_at IS NULL
+		ORDER BY full_name ASC
 	`).Scan(&meta).Error; err != nil {
 		return nil, err
 	}
