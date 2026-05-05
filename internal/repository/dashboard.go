@@ -116,31 +116,36 @@ func (r *dashboardRepository) GetLeaveBalanceSummary(ctx context.Context, employ
 func (r *dashboardRepository) GetEmployeeRequests(ctx context.Context, employeeID uint) ([]dto.EmployeeRequestDTO, error) {
 	var requests []dto.EmployeeRequestDTO
 	err := r.getDB(ctx).Raw(`
-		SELECT id, 'leave'              AS type, 'Cuti'          AS label, created_at::TEXT, status::TEXT AS status
+		SELECT id, 'leave' AS type, 'Cuti' AS label, created_at::TEXT, status::TEXT AS status,
+			start_date::TEXT AS date
 		FROM leave_requests
 		WHERE employee_id = ? AND deleted_at IS NULL
-		  AND (end_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
+		AND (end_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
-		SELECT id, 'permission'         AS type, 'Izin'          AS label, created_at::TEXT, status::TEXT AS status
+		SELECT id, 'permission' AS type, 'Izin' AS label, created_at::TEXT, status::TEXT AS status,
+			date::TEXT AS date
 		FROM permission_requests
 		WHERE employee_id = ? AND deleted_at IS NULL
-		  AND (date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
+		AND (date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
-		SELECT id, 'overtime'           AS type, 'Lembur'        AS label, created_at::TEXT, status::TEXT AS status
+		SELECT id, 'overtime' AS type, 'Lembur' AS label, created_at::TEXT, status::TEXT AS status,
+			overtime_date::TEXT AS date
 		FROM overtime_requests
 		WHERE employee_id = ? AND deleted_at IS NULL
-		  AND (overtime_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
+		AND (overtime_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
-		SELECT id, 'business_trip'      AS type, 'Tugas'    AS label, created_at::TEXT, status::TEXT AS status
+		SELECT id, 'business_trip' AS type, 'Tugas' AS label, created_at::TEXT, status::TEXT AS status,
+			start_date::TEXT AS date
 		FROM business_trip_requests
 		WHERE employee_id = ? AND deleted_at IS NULL
-		  AND (end_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
+		AND (end_date >= CURRENT_DATE OR created_at::DATE = CURRENT_DATE)
 		UNION ALL
-		SELECT ao.id, 'attendance_override' AS type, 'Koreksi Absen' AS label, ao.created_at::TEXT, ao.status::TEXT AS status
+		SELECT ao.id, 'attendance_override' AS type, 'Koreksi Absen' AS label, ao.created_at::TEXT, ao.status::TEXT AS status,
+			al.attendance_date::TEXT AS date
 		FROM attendance_overrides ao
 		JOIN attendance_logs al ON al.id = ao.attendance_log_id AND al.deleted_at IS NULL
 		WHERE ao.requested_by = ? AND ao.deleted_at IS NULL
-		  AND (al.attendance_date >= CURRENT_DATE OR ao.created_at::DATE = CURRENT_DATE)
+		AND (al.attendance_date >= CURRENT_DATE OR ao.created_at::DATE = CURRENT_DATE)
 		ORDER BY created_at DESC
 		LIMIT 10
 	`, employeeID, employeeID, employeeID, employeeID, employeeID).Scan(&requests).Error
@@ -329,28 +334,35 @@ func (r *dashboardRepository) GetExpiringContracts(ctx context.Context, days int
 func (r *dashboardRepository) GetFastestArrivalRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error) {
 	var list []dto.RankingEntryDTO
 	query := `
-		WITH RankedArrivals AS (
+		WITH ActiveSchedule AS (
+			SELECT DISTINCT ON (es.employee_id)
+				es.employee_id,
+				es.shift_template_id
+			FROM employee_schedules es
+			WHERE es.is_active = TRUE
+			AND es.deleted_at IS NULL
+			ORDER BY es.employee_id, es.effective_date DESC
+		),
+		RankedArrivals AS (
 			SELECT
 				al.employee_id,
 				e.full_name,
 				e.employee_number,
 				al.clock_in_at,
-				EXTRACT(EPOCH FROM (al.clock_in_at::time - COALESCE(std.clock_in_end, '08:00:00')::time)) / 60.0 AS diff_minutes
+				EXTRACT(EPOCH FROM (
+					al.clock_in_at::time - COALESCE(std.clock_in_end, '08:00:00')::time
+				)) / 60.0 AS diff_minutes
 			FROM attendance_logs al
 			JOIN employees e ON e.id = al.employee_id
-			LEFT JOIN employee_schedules es
-				ON es.employee_id = e.id
-				AND es.is_active = TRUE
-				AND es.effective_date <= al.attendance_date
-				AND (es.end_date IS NULL OR es.end_date >= al.attendance_date)
-			LEFT JOIN shift_templates st ON st.id = es.shift_template_id
+			LEFT JOIN ActiveSchedule acs ON acs.employee_id = al.employee_id
 			LEFT JOIN shift_template_details std
-				ON std.shift_template_id = st.id
+				ON std.shift_template_id = acs.shift_template_id
 				AND std.day_of_week = LOWER(TRIM(TO_CHAR(al.attendance_date, 'Day')))::day_of_week_enum
 				AND std.is_working_day = TRUE
+				AND std.deleted_at IS NULL
 			WHERE al.attendance_date = ?::DATE
-			  AND al.status IN ('present', 'late')
-			  AND al.deleted_at IS NULL
+			AND al.status IN ('present', 'late')
+			AND al.deleted_at IS NULL
 		)
 		SELECT
 			RANK() OVER (ORDER BY diff_minutes ASC) AS rank,

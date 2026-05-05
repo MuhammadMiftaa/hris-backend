@@ -40,14 +40,15 @@ type EmployeeRequestDTO struct {
 	Type      string `json:"type"`
 	Label     string `json:"label"`
 	CreatedAt string `json:"created_at"`
+	Date      string `json:"date"`
 	Status    string `json:"status"`
 }
 
 type EmployeeDashboardResponse struct {
-	Today           TodayAttendanceStatus    `json:"today"`
-	MutabaahToday   *MutabaahTodayStatus     `json:"mutabaah_today"`
-	MonthlySummary  AttendanceSummaryDTO     `json:"monthly_summary"`
-	LeaveBalances   []LeaveBalanceSummaryDTO `json:"leave_balances"`
+	Today            TodayAttendanceStatus    `json:"today"`
+	MutabaahToday    *MutabaahTodayStatus     `json:"mutabaah_today"`
+	MonthlySummary   AttendanceSummaryDTO     `json:"monthly_summary"`
+	LeaveBalances    []LeaveBalanceSummaryDTO `json:"leave_balances"`
 	EmployeeRequests []EmployeeRequestDTO     `json:"employee_requests"`
 }
 
@@ -139,4 +140,3 @@ type DashboardMetadataResponse struct {
 	LeaveTypeMeta        []Meta `json:"leave_type_meta"`
 	RecentAttendanceMeta []Meta `json:"recent_attendance_meta"`
 }
-
