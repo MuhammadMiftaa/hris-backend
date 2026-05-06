@@ -146,7 +146,10 @@ func (s *attendanceService) GetTodayStatus(ctx context.Context, employeeID uint)
 
 	if log == nil && !isHoliday && !hasLeave && isWorkingDay {
 		canClockIn = true
+	} else if log != nil && log.Status == string(model.AttendanceBusinessTrip) && log.ClockInAt == nil {
+		canClockIn = true
 	}
+
 	if log != nil && log.ClockInAt != nil && log.ClockOutAt == nil {
 		canClockOut = true
 	}
@@ -194,7 +197,9 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("get existing log: %w", err)
 	}
 	if existing != nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: sudah melakukan clock in hari ini")
+		if existing.Status != string(model.AttendanceBusinessTrip) || existing.ClockInAt != nil {
+			return dto.AttendanceLogResponse{}, fmt.Errorf("bad request: sudah melakukan clock in hari ini")
+		}
 	}
 
 	// 2. Cek hari libur
@@ -236,7 +241,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 	if err != nil {
 		return dto.AttendanceLogResponse{}, fmt.Errorf("check business trip: %w", err)
 	}
-	isBusinessTrip := tripID != nil
+	isBusinessTrip := tripID != nil || (existing != nil && existing.Status == string(model.AttendanceBusinessTrip))
 
 	// 6. Validasi GPS radius
 	// GPS check di-skip jika: dinas luar, shift CanWFA=true, atau branch AllowWFH=true
@@ -332,9 +337,27 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 	}
 	defer tx.Rollback()
 
-	created, err := s.repo.CreateLog(ctx, tx, logModel)
-	if err != nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("create log: %w", err)
+	var createdID uint
+	if existing != nil {
+		updates := map[string]interface{}{
+			"clock_in_at":        now,
+			"clock_in_lat":       req.Latitude,
+			"clock_in_lng":       req.Longitude,
+			"clock_in_photo_url": req.PhotoKey,
+			"clock_in_method":    model.ClockMethodGPS,
+			"status":             status, // retains attendance status (e.g., business_trip)
+			"updated_at":         now,
+		}
+		if err := s.repo.UpdateLog(ctx, tx, existing.ID, updates); err != nil {
+			return dto.AttendanceLogResponse{}, fmt.Errorf("update log: %w", err)
+		}
+		createdID = existing.ID
+	} else {
+		created, err := s.repo.CreateLog(ctx, tx, logModel)
+		if err != nil {
+			return dto.AttendanceLogResponse{}, fmt.Errorf("create log: %w", err)
+		}
+		createdID = created.ID
 	}
 
 	// --- Auto-link pending mutabaah ---
@@ -342,7 +365,7 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 	pendingMutabaah, errMutabaah := s.mutabaahRepo.GetTodayLog(ctx, tx, employeeID, todayStr)
 	if errMutabaah == nil && pendingMutabaah != nil && pendingMutabaah.AttendanceLogID == nil {
 		_ = s.mutabaahRepo.UpdateLog(ctx, tx, pendingMutabaah.ID, map[string]interface{}{
-			"attendance_log_id": created.ID,
+			"attendance_log_id": createdID,
 		})
 	}
 
@@ -350,9 +373,9 @@ func (s *attendanceService) ClockIn(ctx context.Context, employeeID uint, req dt
 		return dto.AttendanceLogResponse{}, fmt.Errorf("commit: %w", err)
 	}
 
-	resp, err := s.repo.GetLogByID(ctx, nil, created.ID)
+	resp, err := s.repo.GetLogByID(ctx, nil, createdID)
 	if err != nil || resp == nil {
-		return dto.AttendanceLogResponse{}, fmt.Errorf("get created log: %w", err)
+		return dto.AttendanceLogResponse{}, fmt.Errorf("get log: %w", err)
 	}
 	return *resp, nil
 }
@@ -379,7 +402,7 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 	}
 
 	// 2. GPS check (kecuali business trip, CanWFA, atau AllowWFH)
-	isBusinessTrip := existing.BusinessTripRequestID != nil
+	isBusinessTrip := existing.BusinessTripRequestID != nil || existing.Status == string(model.AttendanceBusinessTrip)
 
 	branchID, err := s.repo.GetEmployeeBranchID(ctx, nil, employeeID)
 	if err != nil {
@@ -430,11 +453,11 @@ func (s *attendanceService) ClockOut(ctx context.Context, employeeID uint, req d
 			if parseErr == nil && now.Before(clockOutStart) {
 				// Pulang lebih awal dari window clock_out_start
 				earlyLeaveMinutes = int(clockOutStart.Sub(now).Minutes())
-				if earlyPerm == nil {
-					// Tidak ada izin → tandai half_day
+				if earlyPerm == nil && newStatus != model.AttendanceBusinessTrip {
+					// Tidak ada izin → tandai half_day (jika bukan dinas luar)
 					newStatus = model.AttendanceHalfDay
 				}
-				// Jika ada izin → status tidak berubah ke half_day
+				// Jika ada izin atau dinas luar → status tidak berubah ke half_day
 			}
 		}
 
