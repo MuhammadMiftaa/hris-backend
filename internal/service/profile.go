@@ -20,16 +20,18 @@ type ProfileService interface {
 	DeletePhoto(ctx context.Context, accountID uint) error
 	GetEmployeeProfile(ctx context.Context, accountID uint) (dto.EmployeeProfileResponse, error)
 	GetEmployeeContacts(ctx context.Context, accountID uint) ([]dto.EmployeeProfileContactResponse, error)
+	GetEmployeeShift(ctx context.Context, accountID uint) (dto.EmployeeProfileShiftResponse, error)
 	ChangePassword(ctx context.Context, accountID uint, req dto.ChangePasswordRequest) error
 }
 
 type profileService struct {
-	repo  repository.ProfileRepository
-	minio storage.MinioClient
+	repo      repository.ProfileRepository
+	shiftRepo repository.ShiftRepository
+	minio     storage.MinioClient
 }
 
-func NewProfileService(repo repository.ProfileRepository, minio storage.MinioClient) ProfileService {
-	return &profileService{repo: repo, minio: minio}
+func NewProfileService(repo repository.ProfileRepository, shiftRepo repository.ShiftRepository, minio storage.MinioClient) ProfileService {
+	return &profileService{repo: repo, shiftRepo: shiftRepo, minio: minio}
 }
 
 // ─── GetProfile ───────────────────────────────────────────────────────────────
@@ -196,6 +198,48 @@ func (s *profileService) GetEmployeeContacts(ctx context.Context, accountID uint
 	}
 
 	return contacts, nil
+}
+
+func (s *profileService) GetEmployeeShift(ctx context.Context, accountID uint) (dto.EmployeeProfileShiftResponse, error) {
+	employee, err := s.repo.GetEmployeeByAccountID(ctx, nil, accountID)
+	if err != nil {
+		return dto.EmployeeProfileShiftResponse{}, fmt.Errorf("get employee: %w", err)
+	}
+
+	perPage := 0
+	scheduleRes, err := s.shiftRepo.GetAllSchedules(ctx, nil, dto.ScheduleListParams{
+		EmployeeID: &employee.ID,
+		PaginationParams: dto.PaginationParams{
+			PerPage: &perPage,
+		},
+	})
+	if err != nil {
+		return dto.EmployeeProfileShiftResponse{}, fmt.Errorf("get schedules: %w", err)
+	}
+
+	// 2. Collect unique shift template IDs from the schedules
+	shiftMap := make(map[uint]bool)
+	var shiftIDs []uint
+	for _, sched := range scheduleRes.Data {
+		if !shiftMap[sched.ShiftTemplateID] {
+			shiftMap[sched.ShiftTemplateID] = true
+			shiftIDs = append(shiftIDs, sched.ShiftTemplateID)
+		}
+	}
+
+	// 3. Get the shift templates
+	var shifts []dto.ShiftTemplateResponse
+	for _, id := range shiftIDs {
+		shift, err := s.shiftRepo.GetShiftTemplateByID(ctx, nil, id)
+		if err == nil {
+			shifts = append(shifts, shift)
+		}
+	}
+
+	return dto.EmployeeProfileShiftResponse{
+		Schedules: scheduleRes.Data,
+		Shifts:    shifts,
+	}, nil
 }
 
 // ─── ChangePassword ───────────────────────────────────────────────────────────

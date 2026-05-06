@@ -113,6 +113,21 @@ func (h *ProfileHandler) GetEmployeeContacts(c *fiber.Ctx) error {
 	})
 }
 
+// GetEmployeeShifts — GET /profile/employee/shifts
+func (h *ProfileHandler) GetEmployeeShifts(c *fiber.Ctx) error {
+	account := getAccountFromCtx(c)
+	result, err := h.service.GetEmployeeShift(c.Context(), account.AccountID)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "employee shift",
+		Data:       result,
+	})
+}
+
 // ChangePassword — POST /profile/change-password
 func (h *ProfileHandler) ChangePassword(c *fiber.Ctx) error {
 	var req dto.ChangePasswordRequest

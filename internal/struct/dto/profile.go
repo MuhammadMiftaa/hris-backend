@@ -69,6 +69,11 @@ type EmployeeProfileContactResponse struct {
 	IsPrimary    bool    `json:"is_primary"`
 }
 
+type EmployeeProfileShiftResponse struct {
+	Schedules []ScheduleResponse      `json:"schedules"`
+	Shifts    []ShiftTemplateResponse `json:"shifts"`
+}
+
 // ── Change Password ────────────────────────────────────────────────
 
 type ChangePasswordRequest struct {
