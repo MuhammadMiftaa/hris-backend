@@ -14,7 +14,7 @@ type DashboardService interface {
 	GetEmployeeDashboard(ctx context.Context, accountID uint, isTrainer bool) (dto.EmployeeDashboardResponse, error)
 	GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error)
 	GetRankings(ctx context.Context) (dto.DashboardRankingsResponse, error)
-	GetDashboardMetadata(ctx context.Context, employeeID uint) (dto.DashboardMetadataResponse, error)
+	GetDashboardMetadata(ctx context.Context, employeeID *uint) (dto.DashboardMetadataResponse, error)
 }
 
 type dashboardService struct {
@@ -183,7 +183,7 @@ func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankin
 	}, nil
 }
 
-func (s *dashboardService) GetDashboardMetadata(ctx context.Context, employeeID uint) (dto.DashboardMetadataResponse, error) {
+func (s *dashboardService) GetDashboardMetadata(ctx context.Context, employeeID *uint) (dto.DashboardMetadataResponse, error) {
 	leaveTypeMeta, err := s.dashboardRepo.GetLeaveTypeMeta(ctx)
 	if err != nil {
 		log.Printf("[WARN] GetLeaveTypeMeta failed: %v", err)
@@ -192,6 +192,10 @@ func (s *dashboardService) GetDashboardMetadata(ctx context.Context, employeeID 
 	if err != nil {
 		log.Printf("[WARN] GetRecentAttendanceMeta failed: %v", err)
 	}
+	employeeMeta, err := s.dashboardRepo.GetEmployeeMeta(ctx, employeeID)
+	if err != nil {
+		log.Printf("[WARN] GetEmployeeMeta failed: %v", err)
+	}
 
 	if leaveTypeMeta == nil {
 		leaveTypeMeta = []dto.Meta{}
@@ -199,9 +203,13 @@ func (s *dashboardService) GetDashboardMetadata(ctx context.Context, employeeID 
 	if recentAttendanceMeta == nil {
 		recentAttendanceMeta = []dto.Meta{}
 	}
+	if employeeMeta == nil {
+		employeeMeta = []dto.Meta{}
+	}
 
 	return dto.DashboardMetadataResponse{
 		LeaveTypeMeta:        leaveTypeMeta,
 		RecentAttendanceMeta: recentAttendanceMeta,
+		EmployeeMeta:         employeeMeta,
 	}, nil
 }

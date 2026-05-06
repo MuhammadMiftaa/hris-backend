@@ -139,4 +139,5 @@ type DashboardRankingsResponse struct {
 type DashboardMetadataResponse struct {
 	LeaveTypeMeta        []Meta `json:"leave_type_meta"`
 	RecentAttendanceMeta []Meta `json:"recent_attendance_meta"`
+	EmployeeMeta         []Meta `json:"employee_meta"`
 }

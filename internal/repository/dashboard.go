@@ -24,8 +24,9 @@ type DashboardRepository interface {
 	GetFastestArrivalRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error)
 	GetTopTilawahByDepartment(ctx context.Context, date string, limit int) ([]dto.DepartmentRankingDTO, error)
 	GetFastestMutabaahRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error)
-	GetRecentAttendanceMeta(ctx context.Context, employeeID uint) ([]dto.Meta, error)
+	GetRecentAttendanceMeta(ctx context.Context, employeeID *uint) ([]dto.Meta, error)
 	GetLeaveTypeMeta(ctx context.Context) ([]dto.Meta, error)
+	GetEmployeeMeta(ctx context.Context, employeeID *uint) ([]dto.Meta, error)
 }
 
 type dashboardRepository struct {
@@ -450,30 +451,77 @@ func (r *dashboardRepository) GetFastestMutabaahRanking(ctx context.Context, dat
 	return list, err
 }
 
-func (r *dashboardRepository) GetRecentAttendanceMeta(ctx context.Context, employeeID uint) ([]dto.Meta, error) {
+func (r *dashboardRepository) GetRecentAttendanceMeta(ctx context.Context, employeeID *uint) ([]dto.Meta, error) {
 	var meta []dto.Meta
-	query := `
-		SELECT 
-			id::TEXT AS id,
-			TO_CHAR(attendance_date, 'DD Month YYYY') || 
-				CASE 
-					WHEN clock_in_at IS NOT NULL AND clock_out_at IS NOT NULL 
-					THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || TO_CHAR(clock_out_at, 'FMHH24:MI') || ')'
-					WHEN clock_in_at IS NOT NULL 
-					THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || CHR(63) || ')'
-					ELSE '' 
-				END AS name
-		FROM attendance_logs
-		WHERE employee_id = ? AND deleted_at IS NULL
-		ORDER BY attendance_date DESC
-		LIMIT 7
-	`
-	err := r.getDB(ctx).Raw(query, employeeID).Scan(&meta).Error
+	var query string
+	var args []interface{}
+
+	if employeeID != nil {
+		query = `
+			SELECT 
+				id::TEXT AS id,
+				TO_CHAR(attendance_date, 'DD Month YYYY') || 
+					CASE 
+						WHEN clock_in_at IS NOT NULL AND clock_out_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || TO_CHAR(clock_out_at, 'FMHH24:MI') || ')'
+						WHEN clock_in_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(clock_in_at, 'FMHH24:MI') || ' - ' || CHR(63) || ')'
+						ELSE '' 
+					END AS name
+			FROM attendance_logs
+			WHERE employee_id = ? AND deleted_at IS NULL
+			ORDER BY attendance_date DESC
+			LIMIT 7
+		`
+		args = []interface{}{*employeeID}
+	} else {
+		query = `
+			SELECT 
+				al.id::TEXT AS id,
+				TO_CHAR(al.attendance_date, 'DD Month YYYY') || ' | ' || e.full_name || 
+					CASE 
+						WHEN al.clock_in_at IS NOT NULL AND al.clock_out_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(al.clock_in_at, 'FMHH24:MI') || ' - ' || TO_CHAR(al.clock_out_at, 'FMHH24:MI') || ')'
+						WHEN al.clock_in_at IS NOT NULL 
+						THEN ' (' || TO_CHAR(al.clock_in_at, 'FMHH24:MI') || ' - ' || CHR(63) || ')'
+						ELSE '' 
+					END AS name
+			FROM attendance_logs al
+			JOIN employees e ON e.id = al.employee_id
+			WHERE al.deleted_at IS NULL
+			ORDER BY al.attendance_date DESC
+			LIMIT 7
+		`
+		args = []interface{}{}
+	}
+
+	err := r.db.Raw(query, args...).Scan(&meta).Error
 	return meta, err
 }
 
 func (r *dashboardRepository) GetLeaveTypeMeta(ctx context.Context) ([]dto.Meta, error) {
 	var meta []dto.Meta
 	err := r.getDB(ctx).Raw("SELECT id::TEXT AS id, name FROM leave_types WHERE deleted_at IS NULL ORDER BY name ASC").Scan(&meta).Error
+	return meta, err
+}
+
+func (r *dashboardRepository) GetEmployeeMeta(ctx context.Context, employeeID *uint) ([]dto.Meta, error) {
+	var meta []dto.Meta
+	var args []interface{}
+
+	query := `
+		SELECT 
+			e.id::TEXT AS id,
+			e.full_name AS name
+		FROM employees e
+		WHERE e.deleted_at IS NULL
+	`
+	if employeeID != nil {
+		query += " AND e.id = ?"
+		args = []interface{}{*employeeID}
+	} else {
+		query += " ORDER BY e.full_name ASC"
+	}
+	err := r.db.Raw(query, args...).Scan(&meta).Error
 	return meta, err
 }

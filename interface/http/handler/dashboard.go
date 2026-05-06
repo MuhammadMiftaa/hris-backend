@@ -3,6 +3,7 @@ package handler
 import (
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/struct/model"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -67,8 +68,12 @@ func (h *DashboardHandler) GetRankings(c *fiber.Ctx) error {
 // GetMetadata — GET /dashboard/metadata
 func (h *DashboardHandler) GetMetadata(c *fiber.Ctx) error {
 	account := getAccountFromCtx(c)
+	var employeeID *uint
+	if account.RoleLevel == string(model.RoleLevelManager) || account.RoleLevel == string(model.RoleLevelStaff) {
+		employeeID = &account.EmployeeID
+	}
 
-	res, err := h.service.GetDashboardMetadata(c.Context(), account.EmployeeID)
+	res, err := h.service.GetDashboardMetadata(c.Context(), employeeID)
 	if err != nil {
 		return respondError(c, err)
 	}
