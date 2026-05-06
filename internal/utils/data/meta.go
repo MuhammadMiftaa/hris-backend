@@ -97,9 +97,7 @@ var (
 	LeaveCategoryMeta = []dto.Meta{
 		{ID: "annual", Name: "Cuti Tahunan"},
 		{ID: "sick", Name: "Sakit"},
-		{ID: "maternity", Name: "Cuti Melahirkan"},
-		{ID: "paternity", Name: "Cuti Ayah"},
-		{ID: "unpaid", Name: "Tanpa Gaji"},
+		{ID: "special", Name: "Spesial"},
 		{ID: "other", Name: "Lainnya"},
 	}
 
