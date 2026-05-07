@@ -17,6 +17,7 @@ type LeaveTypeService interface {
 	CreateLeaveType(ctx context.Context, req dto.CreateLeaveTypeRequest) (dto.LeaveTypeResponse, error)
 	UpdateLeaveType(ctx context.Context, id string, req dto.UpdateLeaveTypeRequest) (dto.LeaveTypeResponse, error)
 	DeleteLeaveType(ctx context.Context, id string) error
+	ExportLeaveTypes(ctx context.Context, params dto.LeaveTypeListParams) (dto.PaginatedResponse[dto.LeaveTypeResponse], error)
 }
 
 type leaveTypeService struct {
@@ -30,7 +31,6 @@ func NewLeaveTypeService(repo repository.LeaveTypeRepository) LeaveTypeService {
 func (s *leaveTypeService) GetMetadata(ctx context.Context) dto.LeaveTypeMetadata {
 	return dto.LeaveTypeMetadata{
 		CategoryMeta:     data.LeaveCategoryMeta,
-		DurationUnitMeta: data.DurationUnitMeta,
 	}
 }
 
@@ -61,15 +61,13 @@ func (s *leaveTypeService) CreateLeaveType(ctx context.Context, req dto.CreateLe
 		MaxDurationPerRequest:   req.MaxDurationPerRequest,
 		MaxOccurrencesPerYear:   req.MaxOccurrencesPerYear,
 		MaxTotalDurationPerYear: req.MaxTotalDurationPerYear,
+		MaxPerMonth:             req.MaxPerMonth,
+		ParentLeaveTypeID:       req.ParentLeaveTypeID,
+		DeductDays:              1.0,
 	}
 
-	if req.MaxDurationUnit != nil {
-		v := model.DurationUnitEnum(*req.MaxDurationUnit)
-		lt.MaxDurationUnit = &v
-	}
-	if req.MaxTotalDurationUnit != nil {
-		v := model.DurationUnitEnum(*req.MaxTotalDurationUnit)
-		lt.MaxTotalDurationUnit = &v
+	if req.DeductDays != nil {
+		lt.DeductDays = *req.DeductDays
 	}
 
 	created, err := s.repo.CreateLeaveType(ctx, lt)
@@ -84,10 +82,11 @@ func (s *leaveTypeService) CreateLeaveType(ctx context.Context, req dto.CreateLe
 		RequiresDocument:        created.RequiresDocument,
 		RequiresDocumentType:    created.RequiresDocumentType,
 		MaxDurationPerRequest:   created.MaxDurationPerRequest,
-		MaxDurationUnit:         created.MaxDurationUnit,
 		MaxOccurrencesPerYear:   created.MaxOccurrencesPerYear,
 		MaxTotalDurationPerYear: created.MaxTotalDurationPerYear,
-		MaxTotalDurationUnit:    created.MaxTotalDurationUnit,
+		MaxPerMonth:             created.MaxPerMonth,
+		ParentLeaveTypeID:       created.ParentLeaveTypeID,
+		DeductDays:              created.DeductDays,
 		CreatedAt:               created.CreatedAt,
 		UpdatedAt:               created.UpdatedAt,
 	}, nil
@@ -110,19 +109,20 @@ func (s *leaveTypeService) UpdateLeaveType(ctx context.Context, id string, req d
 	if req.MaxDurationPerRequest != nil {
 		lt.MaxDurationPerRequest = req.MaxDurationPerRequest
 	}
-	if req.MaxDurationUnit != nil {
-		v := model.DurationUnitEnum(*req.MaxDurationUnit)
-		lt.MaxDurationUnit = &v
-	}
 	if req.MaxOccurrencesPerYear != nil {
 		lt.MaxOccurrencesPerYear = req.MaxOccurrencesPerYear
 	}
 	if req.MaxTotalDurationPerYear != nil {
 		lt.MaxTotalDurationPerYear = req.MaxTotalDurationPerYear
 	}
-	if req.MaxTotalDurationUnit != nil {
-		v := model.DurationUnitEnum(*req.MaxTotalDurationUnit)
-		lt.MaxTotalDurationUnit = &v
+	if req.MaxPerMonth != nil {
+		lt.MaxPerMonth = req.MaxPerMonth
+	}
+	if req.ParentLeaveTypeID != nil {
+		lt.ParentLeaveTypeID = req.ParentLeaveTypeID
+	}
+	if req.DeductDays != nil {
+		lt.DeductDays = *req.DeductDays
 	}
 
 	_, err := s.repo.UpdateLeaveType(ctx, id, lt)
@@ -138,4 +138,10 @@ func (s *leaveTypeService) DeleteLeaveType(ctx context.Context, id string) error
 		return fmt.Errorf("delete leave type: %w", err)
 	}
 	return nil
+}
+
+func (s *leaveTypeService) ExportLeaveTypes(ctx context.Context, params dto.LeaveTypeListParams) (dto.PaginatedResponse[dto.LeaveTypeResponse], error) {
+	allPerPage := -1
+	params.PerPage = &allPerPage
+	return s.repo.GetAllLeaveTypes(ctx, params)
 }

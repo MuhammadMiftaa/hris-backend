@@ -117,6 +117,15 @@ var AllowedSortColumns = map[string]map[string]string{
 		"max_total_duration_per_year": "lt.max_total_duration_per_year",
 		"created_at":                  "lt.created_at",
 	},
+	"balance_summary": {
+		"employee_name":      "e.full_name",
+		"department_name":    "d.name",
+		"job_position_title": "jp.title",
+		"year":               "b.year",
+		"total_allocated":    "total_allocated",
+		"total_used":         "total_used",
+		"total_remaining":    "total_remaining",
+	},
 	"mutabaah_daily": {
 		"employee_name":   "e.full_name",
 		"department_name": "d.name",

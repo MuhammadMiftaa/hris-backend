@@ -101,11 +101,6 @@ var (
 		{ID: "other", Name: "Lainnya"},
 	}
 
-	DurationUnitMeta = []dto.Meta{
-		{ID: "days", Name: "Hari"},
-		{ID: "hours", Name: "Jam"},
-	}
-
 	HolidayTypeMeta = []dto.Meta{
 		{ID: "national", Name: "Nasional"},
 		{ID: "joint", Name: "Cuti Bersama"},

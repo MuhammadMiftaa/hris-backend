@@ -21,7 +21,7 @@ type LeaveRequest struct {
 	LeaveTypeID uint                   `gorm:"not null;index"                               json:"leave_type_id"`
 	StartDate   time.Time              `gorm:"type:date;not null"                           json:"start_date"`
 	EndDate     time.Time              `gorm:"type:date;not null"                           json:"end_date"`
-	TotalDays   int                    `gorm:"not null"                                     json:"total_days"`
+	TotalDays   float64                `gorm:"not null"                                     json:"total_days"`
 	TotalHours  *int                   `                                                    json:"total_hours"`
 	Reason      *string                `gorm:"type:text"                                    json:"reason"`
 	DocumentURL *string                `gorm:"type:text"                                    json:"document_url"`

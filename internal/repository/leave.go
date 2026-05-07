@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -16,8 +17,19 @@ type LeaveRepository interface {
 	// Balance
 	GetAllBalances(ctx context.Context, tx Transaction, params dto.LeaveBalanceListParams) (dto.PaginatedResponse[dto.LeaveBalanceResponse], error)
 	GetBalanceByEmployeeAndType(ctx context.Context, tx Transaction, employeeID uint, leaveTypeID uint, year int) (*dto.LeaveBalanceResponse, error)
+	GetBalanceByID(ctx context.Context, tx Transaction, id uint) (*dto.LeaveBalanceResponse, error)
 	CreateBalance(ctx context.Context, tx Transaction, m model.LeaveBalance) (model.LeaveBalance, error)
-	UpdateBalanceUsage(ctx context.Context, tx Transaction, id uint, usedOccurrences int, usedDuration int) error
+	UpdateBalanceUsage(ctx context.Context, tx Transaction, id uint, usedOccurrences int, usedDuration float64) error
+
+	// Balance management
+	GetEmployeeBalanceSummary(ctx context.Context, tx Transaction, params dto.EmployeeBalanceSummaryParams) (dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse], error)
+	GetBalanceDetailByEmployee(ctx context.Context, tx Transaction, employeeID uint, year int) ([]dto.LeaveBalanceResponse, error)
+	UpsertBalance(ctx context.Context, tx Transaction, req dto.UpsertLeaveBalanceRequest) (model.LeaveBalance, error)
+	DeleteBalance(ctx context.Context, tx Transaction, id uint) error
+
+	// Adjustments
+	CreateAdjustment(ctx context.Context, tx Transaction, m model.LeaveBalanceAdjustment) (model.LeaveBalanceAdjustment, error)
+	GetAdjustmentsByBalanceID(ctx context.Context, tx Transaction, balanceID uint) ([]dto.LeaveBalanceAdjustmentResponse, error)
 
 	// Request
 	GetAllRequests(ctx context.Context, tx Transaction, params dto.LeaveRequestListParams) (dto.PaginatedResponse[dto.LeaveRequestResponse], error)
@@ -71,6 +83,11 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 		JOIN employees e ON e.id = b.employee_id
 		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
 		JOIN leave_types t ON t.id = b.leave_type_id
+		LEFT JOIN (
+		  SELECT leave_balance_id, SUM(delta) AS total_delta
+		  FROM leave_balance_adjustments
+		  GROUP BY leave_balance_id
+		) adj ON adj.leave_balance_id = b.id
 		WHERE b.deleted_at IS NULL
 	`
 	args := []interface{}{}
@@ -118,10 +135,14 @@ func (r *leaveRepository) GetAllBalances(ctx context.Context, tx Transaction, pa
 			b.year,
 			b.used_occurrences,
 			b.used_duration,
+			b.allocated_duration,
 			t.max_occurrences_per_year AS max_occurrences,
 			t.max_total_duration_per_year AS max_duration,
 			(t.max_occurrences_per_year - b.used_occurrences) AS remaining_occurrences,
-			(t.max_total_duration_per_year - b.used_duration) AS remaining_duration,
+			(b.allocated_duration + COALESCE(adj.total_delta, 0) - b.used_duration) AS remaining_duration,
+			b.effective_date::TEXT AS effective_date,
+			b.notes,
+			COALESCE(adj.total_delta, 0) AS total_adjustment,
 			b.created_at,
 			b.updated_at
 	` + baseQuery
@@ -168,16 +189,25 @@ func (r *leaveRepository) GetBalanceByEmployeeAndType(ctx context.Context, tx Tr
 			b.year,
 			b.used_occurrences,
 			b.used_duration,
+			b.allocated_duration,
 			t.max_occurrences_per_year AS max_occurrences,
 			t.max_total_duration_per_year AS max_duration,
 			(t.max_occurrences_per_year - b.used_occurrences) AS remaining_occurrences,
-			(t.max_total_duration_per_year - b.used_duration) AS remaining_duration,
+			(b.allocated_duration + COALESCE(adj.total_delta, 0) - b.used_duration) AS remaining_duration,
+			b.effective_date::TEXT AS effective_date,
+			b.notes,
+			COALESCE(adj.total_delta, 0) AS total_adjustment,
 			b.created_at,
 			b.updated_at
 		FROM leave_balances b
 		JOIN employees e ON e.id = b.employee_id
 		JOIN leave_types t ON t.id = b.leave_type_id
-		WHERE b.employee_id = ? AND b.leave_type_id = ? AND b.year = ? AND b.deleted_at IS NULL
+		LEFT JOIN (
+		  SELECT leave_balance_id, SUM(delta) AS total_delta
+		  FROM leave_balance_adjustments
+		  GROUP BY leave_balance_id
+		) adj ON adj.leave_balance_id = b.id
+		WHERE b.employee_id = ? AND b.leave_type_id = ? AND b.year = ? AND b.deleted_at IS NULL AND b.effective_date <= NOW()
 		LIMIT 1
 	`
 	err = db.Raw(query, employeeID, leaveTypeID, year).Scan(&res).Error
@@ -186,6 +216,55 @@ func (r *leaveRepository) GetBalanceByEmployeeAndType(ctx context.Context, tx Tr
 	}
 	if res.ID == 0 {
 		return nil, nil // not found
+	}
+	return &res, nil
+}
+
+func (r *leaveRepository) GetBalanceByID(ctx context.Context, tx Transaction, id uint) (*dto.LeaveBalanceResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	var res dto.LeaveBalanceResponse
+	query := `
+		SELECT
+			b.id,
+			b.employee_id,
+			e.full_name AS employee_name,
+			d.name AS department_name,
+			b.leave_type_id,
+			t.name AS leave_type_name,
+			b.year,
+			b.used_occurrences,
+			b.used_duration,
+			b.allocated_duration,
+			t.max_occurrences_per_year AS max_occurrences,
+			t.max_total_duration_per_year AS max_duration,
+			(t.max_occurrences_per_year - b.used_occurrences) AS remaining_occurrences,
+			(b.allocated_duration + COALESCE(adj.total_delta, 0) - b.used_duration) AS remaining_duration,
+			b.effective_date::TEXT AS effective_date,
+			b.notes,
+			COALESCE(adj.total_delta, 0) AS total_adjustment,
+			b.created_at,
+			b.updated_at
+		FROM leave_balances b
+		JOIN employees e ON e.id = b.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		JOIN leave_types t ON t.id = b.leave_type_id
+		LEFT JOIN (
+		  SELECT leave_balance_id, SUM(delta) AS total_delta
+		  FROM leave_balance_adjustments
+		  GROUP BY leave_balance_id
+		) adj ON adj.leave_balance_id = b.id
+		WHERE b.id = ? AND b.deleted_at IS NULL
+		LIMIT 1
+	`
+	if err := db.Raw(query, id).Scan(&res).Error; err != nil {
+		return nil, err
+	}
+	if res.ID == 0 {
+		return nil, nil
 	}
 	return &res, nil
 }
@@ -201,7 +280,7 @@ func (r *leaveRepository) CreateBalance(ctx context.Context, tx Transaction, m m
 	return m, nil
 }
 
-func (r *leaveRepository) UpdateBalanceUsage(ctx context.Context, tx Transaction, id uint, usedOccurrences int, usedDuration int) error {
+func (r *leaveRepository) UpdateBalanceUsage(ctx context.Context, tx Transaction, id uint, usedOccurrences int, usedDuration float64) error {
 	db, err := r.getDB(ctx, tx)
 	if err != nil {
 		return err
@@ -516,4 +595,211 @@ func (r *leaveRepository) GetDepartmentMetaList(ctx context.Context, tx Transact
 	var res []dto.Meta
 	err = db.Raw(`SELECT id::TEXT, name FROM departments WHERE deleted_at IS NULL ORDER BY name ASC`).Scan(&res).Error
 	return res, err
+}
+
+func (r *leaveRepository) GetEmployeeBalanceSummary(ctx context.Context, tx Transaction, params dto.EmployeeBalanceSummaryParams) (dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse], error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse]{}, err
+	}
+
+	baseQuery := `
+		FROM leave_balances b
+		JOIN employees e ON e.id = b.employee_id
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		LEFT JOIN job_positions jp ON jp.id = e.job_positions_id AND jp.deleted_at IS NULL
+		LEFT JOIN (
+		  SELECT leave_balance_id, SUM(delta) AS total_delta
+		  FROM leave_balance_adjustments
+		  GROUP BY leave_balance_id
+		) adj ON adj.leave_balance_id = b.id
+		WHERE b.deleted_at IS NULL AND b.effective_date <= NOW()
+	`
+	args := []interface{}{}
+
+	if params.Year != nil {
+		baseQuery += " AND b.year = ?"
+		args = append(args, *params.Year)
+	}
+	if params.EmployeeName != nil && *params.EmployeeName != "" {
+		baseQuery += " AND e.full_name ILIKE ?"
+		args = append(args, "%"+*params.EmployeeName+"%")
+	}
+	if params.DepartmentID != nil {
+		baseQuery += " AND e.department_id = ?"
+		args = append(args, *params.DepartmentID)
+	}
+	if params.JobPositionTitle != nil && *params.JobPositionTitle != "" {
+		baseQuery += " AND (jp.title ILIKE ?)"
+		args = append(args, "%"+*params.JobPositionTitle+"%")
+	}
+
+	var total int
+	countQuery := `
+		SELECT COUNT(*) FROM (
+			SELECT e.id, b.year
+	` + baseQuery + `
+			GROUP BY e.id, b.year
+		) sub
+	`
+	if err := db.Raw(countQuery, args...).Scan(&total).Error; err != nil {
+		return dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse]{}, err
+	}
+
+	selectQuery := `
+		SELECT
+		  e.id AS employee_id,
+		  e.full_name AS employee_name,
+		  d.name AS department_name,
+		  jp.title AS job_position_title,
+		  b.year,
+		  SUM(b.allocated_duration + COALESCE(adj.total_delta, 0)) AS total_allocated,
+		  SUM(b.used_duration) AS total_used,
+		  SUM(b.allocated_duration + COALESCE(adj.total_delta, 0) - b.used_duration) AS total_remaining
+	` + baseQuery + `
+		GROUP BY e.id, e.full_name, d.name, jp.title, b.year
+	`
+
+	selectQuery += utils.BuildSortClause("balance_summary", params.SortBy, params.GetSortDir(), "e.full_name ASC")
+	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
+
+	var res []dto.EmployeeBalanceSummaryResponse
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
+		return dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse]{}, err
+	}
+
+	perPage := params.GetPerPage()
+	totalPage := 1
+	if perPage > 0 && total > 0 {
+		totalPage = (total + perPage - 1) / perPage
+	}
+
+	return dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse]{
+		Data: res,
+		Pagination: dto.PaginationMeta{
+			Page:      params.GetPage(),
+			PerPage:   perPage,
+			Total:     total,
+			TotalPage: totalPage,
+		},
+	}, nil
+}
+
+func (r *leaveRepository) GetBalanceDetailByEmployee(ctx context.Context, tx Transaction, employeeID uint, year int) ([]dto.LeaveBalanceResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `
+		SELECT
+			b.id,
+			b.employee_id,
+			e.full_name AS employee_name,
+			b.leave_type_id,
+			t.name AS leave_type_name,
+			b.year,
+			b.used_occurrences,
+			b.used_duration,
+			b.allocated_duration,
+			t.max_occurrences_per_year AS max_occurrences,
+			t.max_total_duration_per_year AS max_duration,
+			(t.max_occurrences_per_year - b.used_occurrences) AS remaining_occurrences,
+			(b.allocated_duration + COALESCE(adj.total_delta, 0) - b.used_duration) AS remaining_duration,
+			b.effective_date::TEXT AS effective_date,
+			b.notes,
+			COALESCE(adj.total_delta, 0) AS total_adjustment,
+			b.created_at,
+			b.updated_at
+		FROM leave_balances b
+		JOIN employees e ON e.id = b.employee_id
+		JOIN leave_types t ON t.id = b.leave_type_id
+		LEFT JOIN (
+		  SELECT leave_balance_id, SUM(delta) AS total_delta
+		  FROM leave_balance_adjustments
+		  GROUP BY leave_balance_id
+		) adj ON adj.leave_balance_id = b.id
+		WHERE b.employee_id = ? AND b.year = ? AND b.deleted_at IS NULL
+		ORDER BY t.name ASC
+	`
+	var res []dto.LeaveBalanceResponse
+	if err := db.Raw(query, employeeID, year).Scan(&res).Error; err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (r *leaveRepository) UpsertBalance(ctx context.Context, tx Transaction, req dto.UpsertLeaveBalanceRequest) (model.LeaveBalance, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return model.LeaveBalance{}, err
+	}
+
+	effDate, err := time.Parse("2006-01-02", req.EffectiveDate)
+	if err != nil {
+		return model.LeaveBalance{}, fmt.Errorf("invalid effective_date: %w", err)
+	}
+
+	var m model.LeaveBalance
+	query := `
+		INSERT INTO leave_balances
+			(employee_id, leave_type_id, year, allocated_duration, effective_date, notes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+		ON CONFLICT (employee_id, leave_type_id, year) WHERE deleted_at IS NULL
+		DO UPDATE SET
+			allocated_duration = EXCLUDED.allocated_duration,
+			effective_date     = EXCLUDED.effective_date,
+			notes              = EXCLUDED.notes,
+			updated_at         = NOW()
+		RETURNING *
+	`
+	if err := db.Raw(query, req.EmployeeID, req.LeaveTypeID, req.Year, req.AllocatedDuration, effDate, req.Notes).Scan(&m).Error; err != nil {
+		return model.LeaveBalance{}, err
+	}
+	return m, nil
+}
+
+func (r *leaveRepository) DeleteBalance(ctx context.Context, tx Transaction, id uint) error {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return err
+	}
+	return db.Where("id = ?", id).Delete(&model.LeaveBalance{}).Error
+}
+
+func (r *leaveRepository) CreateAdjustment(ctx context.Context, tx Transaction, m model.LeaveBalanceAdjustment) (model.LeaveBalanceAdjustment, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return m, err
+	}
+	if err := db.Create(&m).Error; err != nil {
+		return m, err
+	}
+	return m, nil
+}
+
+func (r *leaveRepository) GetAdjustmentsByBalanceID(ctx context.Context, tx Transaction, balanceID uint) ([]dto.LeaveBalanceAdjustmentResponse, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `
+		SELECT
+			a.id,
+			a.leave_balance_id,
+			e.full_name AS adjuster_name,
+			a.delta,
+			a.reason,
+			a.created_at::TEXT AS created_at
+		FROM leave_balance_adjustments a
+		JOIN employees e ON e.id = a.adjusted_by
+		WHERE a.leave_balance_id = ?
+		ORDER BY a.created_at DESC
+	`
+	var res []dto.LeaveBalanceAdjustmentResponse
+	if err := db.Raw(query, balanceID).Scan(&res).Error; err != nil {
+		return nil, err
+	}
+	return res, nil
 }

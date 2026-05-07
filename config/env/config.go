@@ -42,6 +42,10 @@ type (
 		URL string `env:"GOTENBERG_URL"`
 	}
 
+	Vapid struct {
+		PrivateKey string `env:"VAPID_PRIVATE_KEY"`
+	}
+
 	ExternalAPI struct {
 		IndonesiaHolidayAPIKey string `env:"INDONESIA_HOLIDAY_API_KEY"`
 		IndonesiaHolidayAPIURL string `env:"INDONESIA_HOLIDAY_API_URL"`
@@ -53,6 +57,7 @@ type (
 		Redis       Redis
 		Minio       Minio
 		Gotenberg   Gotenberg
+		Vapid       Vapid
 		ExternalAPI ExternalAPI
 	}
 )
@@ -105,11 +110,9 @@ func LoadNative() ([]string, error) {
 	lookupEnv("MINIO_ROOT_PASSWORD", &Cfg.Minio.SecretKey, &missing)
 	lookupEnv("MINIO_PUBLIC_URL", &Cfg.Minio.PublicURL, &missing)
 
-	if val, ok := os.LookupEnv("GOTENBERG_URL"); ok {
-		Cfg.Gotenberg.URL = val
-	} else {
-		Cfg.Gotenberg.URL = "http://gotenberg:3000"
-	}
+	lookupEnv("GOTENBERG_URL", &Cfg.Gotenberg.URL, &missing)
+
+	lookupEnv("VAPID_PRIVATE_KEY", &Cfg.Vapid.PrivateKey, &missing)
 
 	lookupEnv("INDONESIA_HOLIDAY_API_KEY", &Cfg.ExternalAPI.IndonesiaHolidayAPIKey, &missing)
 	lookupEnv("INDONESIA_HOLIDAY_API_URL", &Cfg.ExternalAPI.IndonesiaHolidayAPIURL, &missing)

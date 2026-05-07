@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"fmt"
+	"time"
+
 	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
+	"hris-backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -111,4 +115,92 @@ func (h *LeaveTypeHandler) Delete(c *fiber.Ctx) error {
 		StatusCode: 200,
 		Message:    "Leave type deleted",
 	})
+}
+
+func (h *LeaveTypeHandler) Export(c *fiber.Ctx) error {
+	var params dto.LeaveTypeListParams
+	if err := c.QueryParser(&params); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	var exportReq dto.ExportRequest
+	if err := c.QueryParser(&exportReq); err != nil {
+		return respondBadRequest(c, err.Error())
+	}
+
+	result, err := h.service.ExportLeaveTypes(c.Context(), params)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	switch exportReq.Format {
+	case dto.ExportCSV:
+		headers := []string{"ID", "Nama", "Kategori", "Wajib Dokumen", "Jenis Dokumen", "Maks/Request", "Maks/Tahun", "Potongan"}
+		var rows [][]string
+		for _, lt := range result.Data {
+			reqDoc := "Tidak"
+			if lt.RequiresDocument {
+				reqDoc = "Ya"
+			}
+			docType := "-"
+			if lt.RequiresDocumentType != nil {
+				docType = *lt.RequiresDocumentType
+			}
+			maxReq := "-"
+			if lt.MaxDurationPerRequest != nil {
+				maxReq = fmt.Sprintf("%.2f", *lt.MaxDurationPerRequest)
+			}
+			maxYear := "-"
+			if lt.MaxTotalDurationPerYear != nil {
+				maxYear = fmt.Sprintf("%.2f", *lt.MaxTotalDurationPerYear)
+			}
+			rows = append(rows, []string{
+				fmt.Sprintf("%d", lt.ID), lt.Name, string(lt.Category), reqDoc, docType, maxReq, maxYear, fmt.Sprintf("%.2f", lt.DeductDays),
+			})
+		}
+		data, err := utils.WriteCSV(headers, rows)
+		if err != nil {
+			return respondError(c, err)
+		}
+		c.Set("Content-Type", "text/csv; charset=utf-8")
+		c.Set("Content-Disposition", "attachment; filename=jenis_cuti.csv")
+		return c.Send(data)
+
+	case dto.ExportPDF:
+		headers := []string{"Nama", "Kategori", "Wajib Dokumen", "Maks/Request", "Maks/Tahun", "Potongan"}
+		var rows [][]string
+		for _, lt := range result.Data {
+			reqDoc := "Tidak"
+			if lt.RequiresDocument {
+				reqDoc = "Ya"
+			}
+			maxReq := "-"
+			if lt.MaxDurationPerRequest != nil {
+				maxReq = fmt.Sprintf("%.2f", *lt.MaxDurationPerRequest)
+			}
+			maxYear := "-"
+			if lt.MaxTotalDurationPerYear != nil {
+				maxYear = fmt.Sprintf("%.2f", *lt.MaxTotalDurationPerYear)
+			}
+			rows = append(rows, []string{
+				lt.Name, string(lt.Category), reqDoc, maxReq, maxYear, fmt.Sprintf("%.2f", lt.DeductDays),
+			})
+		}
+		html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
+			Title: "Daftar Jenis Cuti", Date: time.Now().Format("02 Jan 2006"),
+			Headers: headers, Rows: rows, TotalData: len(result.Data),
+		})
+		if err != nil {
+			return respondError(c, err)
+		}
+		pdf, err := utils.GeneratePDF(html)
+		if err != nil {
+			return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
+		}
+		c.Set("Content-Type", "application/pdf")
+		c.Set("Content-Disposition", "attachment; filename=jenis_cuti.pdf")
+		return c.Send(pdf)
+	default:
+		return respondBadRequest(c, "format must be csv or pdf")
+	}
 }

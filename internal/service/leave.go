@@ -22,26 +22,38 @@ type LeaveService interface {
 	CreateRequest(ctx context.Context, employeeID uint, roleLevel string, req dto.CreateLeaveRequest) (dto.LeaveRequestResponse, error)
 	ApproveRequest(ctx context.Context, approverID uint, requestID uint, req dto.ApproveLeaveRequest) (dto.LeaveRequestResponse, error)
 	RejectRequest(ctx context.Context, approverID uint, requestID uint, req dto.RejectLeaveRequest) (dto.LeaveRequestResponse, error)
+
+	// Balance management
+	GetEmployeeBalanceSummary(ctx context.Context, params dto.EmployeeBalanceSummaryParams) (dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse], error)
+	GetEmployeeBalanceDetail(ctx context.Context, employeeID uint, year int) (dto.EmployeeBalanceDetailResponse, error)
+	UpsertBalance(ctx context.Context, hrID uint, req dto.UpsertLeaveBalanceRequest) (dto.LeaveBalanceResponse, error)
+	DeleteBalance(ctx context.Context, id uint) error
+	AdjustBalance(ctx context.Context, hrID uint, balanceID uint, req dto.AdjustLeaveBalanceRequest) (dto.LeaveBalanceResponse, error)
+	GetBalanceAdjustments(ctx context.Context, balanceID uint) ([]dto.LeaveBalanceAdjustmentResponse, error)
+	ExportEmployeeBalanceSummary(ctx context.Context, params dto.EmployeeBalanceSummaryParams) (dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse], error)
 }
 
 type leaveService struct {
-	repo       repository.LeaveRepository
-	attendRepo repository.AttendanceRepository
-	txManager  repository.TxManager
-	minio      storage.MinioClient
+	repo          repository.LeaveRepository
+	leaveTypeRepo repository.LeaveTypeRepository
+	attendRepo    repository.AttendanceRepository
+	txManager     repository.TxManager
+	minio         storage.MinioClient
 }
 
 func NewLeaveService(
 	repo repository.LeaveRepository,
+	leaveTypeRepo repository.LeaveTypeRepository,
 	attendRepo repository.AttendanceRepository,
 	txManager repository.TxManager,
 	minio storage.MinioClient,
 ) LeaveService {
 	return &leaveService{
-		repo:       repo,
-		attendRepo: attendRepo,
-		txManager:  txManager,
-		minio:      minio,
+		repo:          repo,
+		leaveTypeRepo: leaveTypeRepo,
+		attendRepo:    attendRepo,
+		txManager:     txManager,
+		minio:         minio,
 	}
 }
 
@@ -148,23 +160,40 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, roleL
 	}
 	defer tx.Rollback()
 
+	// Fetch Leave Type
+	lt, err := s.leaveTypeRepo.GetLeaveTypeByID(ctx, fmt.Sprint(req.LeaveTypeID))
+	if err != nil {
+		return dto.LeaveRequestResponse{}, fmt.Errorf("get leave type: %w", err)
+	}
+
+	balanceTypeID := req.LeaveTypeID
+	if lt.ParentLeaveTypeID != nil {
+		balanceTypeID = *lt.ParentLeaveTypeID
+	}
+
+	deductDays := lt.DeductDays
+
 	// Ensure balance exists
 	currYear := time.Now().Year()
-	bal, err := s.repo.GetBalanceByEmployeeAndType(ctx, tx, targetEmployeeID, req.LeaveTypeID, currYear)
+	bal, err := s.repo.GetBalanceByEmployeeAndType(ctx, tx, targetEmployeeID, balanceTypeID, currYear)
 	if err != nil {
 		return dto.LeaveRequestResponse{}, fmt.Errorf("check balance: %w", err)
 	}
 	if bal == nil {
 		newBal := model.LeaveBalance{
 			EmployeeID:  targetEmployeeID,
-			LeaveTypeID: req.LeaveTypeID,
+			LeaveTypeID: balanceTypeID,
 			Year:        currYear,
 		}
 		if _, e := s.repo.CreateBalance(ctx, tx, newBal); e != nil {
 			return dto.LeaveRequestResponse{}, fmt.Errorf("create balance: %w", e)
 		}
 	} else {
-		if bal.MaxDuration != nil && bal.UsedDuration+req.TotalDays > *bal.MaxDuration {
+		remaining := bal.AllocatedDuration + bal.TotalAdjustment - bal.UsedDuration
+		if remaining < deductDays {
+			return dto.LeaveRequestResponse{}, fmt.Errorf("saldo cuti tidak mencukupi (sisa: %.1f, dibutuhkan: %.1f)", remaining, deductDays)
+		}
+		if bal.MaxDuration != nil && bal.UsedDuration+deductDays > *bal.MaxDuration {
 			return dto.LeaveRequestResponse{}, fmt.Errorf("leave duration exceeds max duration")
 		}
 		if bal.MaxOccurrences != nil && bal.UsedOccurrences+1 > *bal.MaxOccurrences {
@@ -230,9 +259,9 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, roleL
 	}
 
 	if isAdminSubmission {
-		balRefresher, _ := s.repo.GetBalanceByEmployeeAndType(ctx, tx, targetEmployeeID, req.LeaveTypeID, currYear)
+		balRefresher, _ := s.repo.GetBalanceByEmployeeAndType(ctx, tx, targetEmployeeID, balanceTypeID, currYear)
 		if balRefresher != nil {
-			err = s.repo.UpdateBalanceUsage(ctx, tx, balRefresher.ID, balRefresher.UsedOccurrences+1, balRefresher.UsedDuration+req.TotalDays)
+			err = s.repo.UpdateBalanceUsage(ctx, tx, balRefresher.ID, balRefresher.UsedOccurrences+1, balRefresher.UsedDuration+deductDays)
 			if err != nil {
 				return dto.LeaveRequestResponse{}, fmt.Errorf("update balance: %w", err)
 			}
@@ -317,9 +346,23 @@ func (s *leaveService) ApproveRequest(ctx context.Context, approverID uint, requ
 		currYear := time.Now().Year() // assuming it starts from current request year realistically
 		sDate, _ := time.Parse("2006-01-02", request.StartDate)
 		currYear = sDate.Year()
-		bal, _ := s.repo.GetBalanceByEmployeeAndType(ctx, tx, request.EmployeeID, request.LeaveTypeID, currYear)
+		
+		lt, err := s.leaveTypeRepo.GetLeaveTypeByID(ctx, fmt.Sprint(request.LeaveTypeID))
+		if err != nil {
+			return dto.LeaveRequestResponse{}, fmt.Errorf("get leave type for approval: %w", err)
+		}
+		balanceTypeID := request.LeaveTypeID
+		deductDays := request.TotalDays
+		if lt.ID != 0 {
+			if lt.ParentLeaveTypeID != nil {
+				balanceTypeID = *lt.ParentLeaveTypeID
+			}
+			deductDays = lt.DeductDays
+		}
+
+		bal, _ := s.repo.GetBalanceByEmployeeAndType(ctx, tx, request.EmployeeID, balanceTypeID, currYear)
 		if bal != nil {
-			err = s.repo.UpdateBalanceUsage(ctx, tx, bal.ID, bal.UsedOccurrences+1, bal.UsedDuration+request.TotalDays)
+			err = s.repo.UpdateBalanceUsage(ctx, tx, bal.ID, bal.UsedOccurrences+1, bal.UsedDuration+deductDays)
 			if err != nil {
 				return dto.LeaveRequestResponse{}, fmt.Errorf("update balance: %w", err)
 			}
@@ -399,4 +442,102 @@ func (s *leaveService) RejectRequest(ctx context.Context, approverID uint, reque
 	}
 
 	return s.GetRequestByID(ctx, requestID)
+}
+
+func (s *leaveService) GetEmployeeBalanceSummary(ctx context.Context, params dto.EmployeeBalanceSummaryParams) (dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse], error) {
+	return s.repo.GetEmployeeBalanceSummary(ctx, nil, params)
+}
+
+func (s *leaveService) GetEmployeeBalanceDetail(ctx context.Context, employeeID uint, year int) (dto.EmployeeBalanceDetailResponse, error) {
+	balances, err := s.repo.GetBalanceDetailByEmployee(ctx, nil, employeeID, year)
+	if err != nil {
+		return dto.EmployeeBalanceDetailResponse{}, err
+	}
+
+	name := ""
+	if len(balances) > 0 && balances[0].EmployeeName != nil {
+		name = *balances[0].EmployeeName
+	}
+
+	return dto.EmployeeBalanceDetailResponse{
+		EmployeeID:   employeeID,
+		EmployeeName: name,
+		Year:         year,
+		Balances:     balances,
+	}, nil
+}
+
+func (s *leaveService) UpsertBalance(ctx context.Context, hrID uint, req dto.UpsertLeaveBalanceRequest) (dto.LeaveBalanceResponse, error) {
+	if _, err := time.Parse("2006-01-02", req.EffectiveDate); err != nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("effective_date invalid: %w", err)
+	}
+
+	tx, err := s.txManager.Begin(ctx)
+	if err != nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	m, err := s.repo.UpsertBalance(ctx, tx, req)
+	if err != nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("upsert balance: %w", err)
+	}
+
+	updated, err := s.repo.GetBalanceByID(ctx, tx, m.ID)
+	if err != nil {
+		return dto.LeaveBalanceResponse{}, err
+	}
+	if updated == nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("balance not found after upsert")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("commit tx: %w", err)
+	}
+	return *updated, nil
+}
+
+func (s *leaveService) DeleteBalance(ctx context.Context, id uint) error {
+	return s.repo.DeleteBalance(ctx, nil, id)
+}
+
+func (s *leaveService) AdjustBalance(ctx context.Context, hrID uint, balanceID uint, req dto.AdjustLeaveBalanceRequest) (dto.LeaveBalanceResponse, error) {
+	tx, err := s.txManager.Begin(ctx)
+	if err != nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	adj := model.LeaveBalanceAdjustment{
+		LeaveBalanceID: balanceID,
+		AdjustedBy:     hrID,
+		Delta:          req.Delta,
+		Reason:         req.Reason,
+	}
+	if _, err := s.repo.CreateAdjustment(ctx, tx, adj); err != nil {
+		return dto.LeaveBalanceResponse{}, err
+	}
+
+	updated, err := s.repo.GetBalanceByID(ctx, tx, balanceID)
+	if err != nil {
+		return dto.LeaveBalanceResponse{}, err
+	}
+	if updated == nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("balance not found")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return dto.LeaveBalanceResponse{}, fmt.Errorf("commit tx: %w", err)
+	}
+	return *updated, nil
+}
+
+func (s *leaveService) GetBalanceAdjustments(ctx context.Context, balanceID uint) ([]dto.LeaveBalanceAdjustmentResponse, error) {
+	return s.repo.GetAdjustmentsByBalanceID(ctx, nil, balanceID)
+}
+
+func (s *leaveService) ExportEmployeeBalanceSummary(ctx context.Context, params dto.EmployeeBalanceSummaryParams) (dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse], error) {
+	allPerPage := -1
+	params.PerPage = &allPerPage
+	return s.repo.GetEmployeeBalanceSummary(ctx, nil, params)
 }

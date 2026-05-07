@@ -67,9 +67,10 @@ func (r *leaveTypeRepository) GetAllLeaveTypes(ctx context.Context, params dto.L
 	selectQuery := `
 		SELECT
 			lt.id, lt.name, lt.category, lt.requires_document, lt.requires_document_type,
-			lt.max_duration_per_request, lt.max_duration_unit,
+			lt.max_duration_per_request,
 			lt.max_occurrences_per_year,
-			lt.max_total_duration_per_year, lt.max_total_duration_unit,
+			lt.max_total_duration_per_year,
+			lt.max_per_month, lt.parent_leave_type_id, lt.deduct_days,
 			lt.created_at, lt.updated_at
 	` + baseQuery
 
@@ -103,9 +104,10 @@ func (r *leaveTypeRepository) GetLeaveTypeByID(ctx context.Context, id string) (
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			id, name, category, requires_document, requires_document_type,
-			max_duration_per_request, max_duration_unit,
+			max_duration_per_request,
 			max_occurrences_per_year,
-			max_total_duration_per_year, max_total_duration_unit,
+			max_total_duration_per_year,
+			max_per_month, parent_leave_type_id, deduct_days,
 			created_at, updated_at
 		FROM leave_types
 		WHERE deleted_at IS NULL AND id = ?
