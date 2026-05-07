@@ -144,9 +144,6 @@ func (h *AttendanceHandler) List(c *fiber.Ctx) error {
 	}
 
 	account := getAccountFromCtx(c)
-	// if account.RoleLevel == string(model.RoleLevelManager) || account.RoleLevel == string(model.RoleLevelStaff) {
-	// 	params.EmployeeID = &account.EmployeeID
-	// }
 
 	result, err := h.service.GetAllLogs(c.Context(), account.RoleLevel, params)
 	if err != nil {

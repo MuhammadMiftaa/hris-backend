@@ -59,7 +59,8 @@ func (h *LeaveHandler) ListRequests(c *fiber.Ctx) error {
 		return respondBadRequest(c, err.Error())
 	}
 
-	res, err := h.service.GetAllRequests(c.Context(), params)
+	account := getAccountFromCtx(c)
+	res, err := h.service.GetAllRequests(c.Context(), account.RoleLevel, params)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -266,10 +267,11 @@ func (h *LeaveHandler) ExportRequests(c *fiber.Ctx) error {
 		return respondBadRequest(c, err.Error())
 	}
 
+	account := getAccountFromCtx(c)
 	allPerPage := 0
 	params.PerPage = &allPerPage
 
-	res, err := h.service.GetAllRequests(c.Context(), params)
+	res, err := h.service.GetAllRequests(c.Context(), account.RoleLevel, params)
 	if err != nil {
 		return respondError(c, err)
 	}
