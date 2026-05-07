@@ -88,7 +88,7 @@ func (h *BusinessTripHandler) exportCSV(c *fiber.Ctx, trips []dto.BusinessTripRe
 		return respondError(c, err)
 	}
 	c.Set("Content-Type", "text/csv; charset=utf-8")
-	c.Set("Content-Disposition", "attachment; filename=perjalanan_dinas.csv")
+	c.Set("Content-Disposition", "attachment; filename=perjalanan_tugas.csv")
 	return c.Send(data)
 }
 
@@ -109,7 +109,7 @@ func (h *BusinessTripHandler) exportPDF(c *fiber.Ctx, trips []dto.BusinessTripRe
 		})
 	}
 	html, err := utils.RenderPDFHTML(utils.PDFTemplateData{
-		Title: "Daftar Perjalanan Dinas", Date: time.Now().Format("02 Jan 2006"),
+		Title: "Daftar Perjalanan Tugas", Date: time.Now().Format("02 Jan 2006"),
 		Headers: headers, Rows: rows, TotalData: len(trips),
 	})
 	if err != nil {
@@ -120,7 +120,7 @@ func (h *BusinessTripHandler) exportPDF(c *fiber.Ctx, trips []dto.BusinessTripRe
 		return respondError(c, fmt.Errorf("gagal generate PDF: %w", err))
 	}
 	c.Set("Content-Type", "application/pdf")
-	c.Set("Content-Disposition", "attachment; filename=perjalanan_dinas.pdf")
+	c.Set("Content-Disposition", "attachment; filename=perjalanan_tugas.pdf")
 	return c.Send(pdf)
 }
 
