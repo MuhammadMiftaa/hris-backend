@@ -44,6 +44,7 @@ type (
 
 	Vapid struct {
 		PrivateKey string `env:"VAPID_PRIVATE_KEY"`
+		PublicKey  string `env:"VAPID_PUBLIC_KEY"`
 	}
 
 	ExternalAPI struct {
@@ -113,6 +114,7 @@ func LoadNative() ([]string, error) {
 	lookupEnv("GOTENBERG_URL", &Cfg.Gotenberg.URL, &missing)
 
 	lookupEnv("VAPID_PRIVATE_KEY", &Cfg.Vapid.PrivateKey, &missing)
+	lookupEnv("VAPID_PUBLIC_KEY", &Cfg.Vapid.PublicKey, &missing)
 
 	lookupEnv("INDONESIA_HOLIDAY_API_KEY", &Cfg.ExternalAPI.IndonesiaHolidayAPIKey, &missing)
 	lookupEnv("INDONESIA_HOLIDAY_API_URL", &Cfg.ExternalAPI.IndonesiaHolidayAPIURL, &missing)

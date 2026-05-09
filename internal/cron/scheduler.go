@@ -24,7 +24,9 @@ func NewScheduler(cronSvc service.CronService) *Scheduler {
 
 // Start — mulai scheduler di goroutine terpisah
 func (s *Scheduler) Start() {
-	go s.run()
+	go s.runDailyJobs()
+	go s.runHourlyJobs()
+	go s.runPushSender()
 	logger.Info("cron: scheduler started")
 }
 
@@ -34,8 +36,11 @@ func (s *Scheduler) Stop() {
 	logger.Info("cron: scheduler stopped")
 }
 
-func (s *Scheduler) run() {
-	// Pertama kali: hitung waktu ke pukul 23:50 berikutnya
+// ============================================================================
+// DAILY JOBS (23:50 WIB)
+// ============================================================================
+
+func (s *Scheduler) runDailyJobs() {
 	now := utils.NowWIB()
 	next := nextRunTime(now, 23, 50)
 
@@ -46,7 +51,6 @@ func (s *Scheduler) run() {
 		select {
 		case <-timer.C:
 			s.runJobs()
-			// Reset timer ke 23:50 besok
 			now = utils.NowWIB()
 			next = nextRunTime(now, 23, 50)
 			timer.Reset(next.Sub(now))
@@ -89,6 +93,85 @@ func (s *Scheduler) runJobs() {
 			"date":  today,
 			"error": err.Error(),
 		})
+	}
+
+	// 4. Generate tomorrow's push reminders
+	time.Sleep(5 * time.Second)
+
+	if err := s.cronSvc.GenerateDailyPushReminders(ctx, today); err != nil {
+		logger.Error("cron: generate push reminders failed", map[string]any{
+			"date":  today,
+			"error": err.Error(),
+		})
+	}
+}
+
+// ============================================================================
+// HOURLY JOBS (12:00 & 18:00 WIB)
+// ============================================================================
+
+func (s *Scheduler) runHourlyJobs() {
+	// Check every minute for exact times
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.checkHourlyJobs()
+		case <-s.quit:
+			return
+		}
+	}
+}
+
+func (s *Scheduler) checkHourlyJobs() {
+	now := utils.NowWIB()
+	today := utils.TodayDate()
+
+	// 12:00 WIB — Mutabaah reminder (first)
+	if now.Hour() == 12 && now.Minute() == 0 {
+		ctx := context.Background()
+		if err := s.cronSvc.SendMutabaahReminders(ctx, today); err != nil {
+			logger.Error("cron: mutabaah reminder (12:00) failed", map[string]any{
+				"date":  today,
+				"error": err.Error(),
+			})
+		}
+	}
+
+	// 18:00 WIB — Mutabaah reminder (second)
+	if now.Hour() == 18 && now.Minute() == 0 {
+		ctx := context.Background()
+		if err := s.cronSvc.SendMutabaahReminders(ctx, today); err != nil {
+			logger.Error("cron: mutabaah reminder (18:00) failed", map[string]any{
+				"date":  today,
+				"error": err.Error(),
+			})
+		}
+	}
+}
+
+// ============================================================================
+// PUSH SENDER (every 1 minute)
+// ============================================================================
+
+func (s *Scheduler) runPushSender() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			ctx := context.Background()
+			if err := s.cronSvc.SendPendingNotifications(ctx); err != nil {
+				logger.Error("cron: send pending notifications failed", map[string]any{
+					"error": err.Error(),
+				})
+			}
+		case <-s.quit:
+			return
+		}
 	}
 }
 

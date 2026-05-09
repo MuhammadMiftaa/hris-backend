@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	logger "hris-backend/config/log"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -26,17 +27,20 @@ type overtimeService struct {
 	repo       repository.OvertimeRepository
 	attendRepo repository.AttendanceRepository
 	txManager  repository.TxManager
+	notifSvc   NotificationService
 }
 
 func NewOvertimeService(
 	repo repository.OvertimeRepository,
 	attendRepo repository.AttendanceRepository,
 	txManager repository.TxManager,
+	notifSvc NotificationService,
 ) OvertimeService {
 	return &overtimeService{
 		repo:       repo,
 		attendRepo: attendRepo,
 		txManager:  txManager,
+		notifSvc:   notifSvc,
 	}
 }
 
@@ -177,6 +181,16 @@ func (s *overtimeService) Create(ctx context.Context, employeeID uint, roleLevel
 		return dto.OvertimeRequestResponse{}, err
 	}
 
+	// Trigger approval notification (fire-and-forget)
+	if !isAdminSubmission {
+		if err := s.notifSvc.TriggerRequestApprovalNotification(ctx, "overtime", created.ID, targetEmployeeID); err != nil {
+			logger.Error("failed to trigger overtime approval notification", map[string]any{
+				"request_id": created.ID,
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	return s.GetByID(ctx, created.ID)
 }
 
@@ -235,6 +249,16 @@ func (s *overtimeService) ApproveRequest(ctx context.Context, approverID uint, r
 		return dto.OvertimeRequestResponse{}, err
 	}
 
+	// Trigger result notification to requester
+	if reqData != nil {
+		if err := s.notifSvc.TriggerApprovalResultNotification(ctx, "overtime", requestID, reqData.EmployeeID, newMainStatus); err != nil {
+			logger.Error("failed to trigger overtime approval result notification", map[string]any{
+				"request_id": requestID,
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	return s.GetByID(ctx, requestID)
 }
 
@@ -279,6 +303,16 @@ func (s *overtimeService) RejectRequest(ctx context.Context, approverID uint, re
 
 	if err := tx.Commit(); err != nil {
 		return dto.OvertimeRequestResponse{}, err
+	}
+
+	// Trigger rejection notification to requester
+	if reqData != nil {
+		if err := s.notifSvc.TriggerApprovalResultNotification(ctx, "overtime", requestID, reqData.EmployeeID, "rejected"); err != nil {
+			logger.Error("failed to trigger overtime rejection notification", map[string]any{
+				"request_id": requestID,
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	return s.GetByID(ctx, requestID)

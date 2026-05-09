@@ -6,13 +6,14 @@ import (
 	"hris-backend/interface/http/middleware"
 	"hris-backend/interface/http/route"
 	"hris-backend/internal/redis"
+	"hris-backend/internal/service"
 	"hris-backend/internal/struct/dto"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
-func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, minioClient storage.MinioClient) *fiber.App {
+func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, minioClient storage.MinioClient, notifSvc service.NotificationService) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "WAFA HRIS",
 		ServerHeader: "WAFA HRIS",
@@ -70,14 +71,16 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, mi
 	route.HolidayRoutes(app, dbInstance.GetDB())
 	route.AttendanceRoutes(app, dbInstance.GetDB(), minioClient)
 	route.MutabaahRoutes(app, dbInstance.GetDB())
-	route.LeaveRoutes(app, dbInstance.GetDB(), minioClient)
-	route.PermissionRequestRoutes(app, dbInstance.GetDB())
-	route.BusinessTripRoutes(app, dbInstance.GetDB(), minioClient)
-	route.OvertimeRoutes(app, dbInstance.GetDB())
+	route.LeaveRoutes(app, dbInstance.GetDB(), minioClient, notifSvc)
+	route.PermissionRequestRoutes(app, dbInstance.GetDB(), notifSvc)
+	route.BusinessTripRoutes(app, dbInstance.GetDB(), minioClient, notifSvc)
+	route.OvertimeRoutes(app, dbInstance.GetDB(), notifSvc)
 	route.DailyReportRoutes(app, dbInstance.GetDB())
 	route.DashboardRoutes(app, dbInstance.GetDB())
 	route.ProfileRoutes(app, dbInstance.GetDB(), minioClient)
 	route.DocumentRoutes(app, minioClient)
+	route.PushRoutes(app, dbInstance.GetDB())
+	route.NotificationRoutes(app, dbInstance.GetDB())
 
 	return app
 }

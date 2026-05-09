@@ -12,12 +12,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func LeaveRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
+func LeaveRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient, notifSvc service.NotificationService) {
 	leaveRepo := repository.NewLeaveRepository(db)
 	leaveTypeRepo := repository.NewLeaveTypeRepository(db)
 	attendRepo := repository.NewAttendanceRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewLeaveService(leaveRepo, leaveTypeRepo, attendRepo, txManager, minio)
+	svc := service.NewLeaveService(leaveRepo, leaveTypeRepo, attendRepo, txManager, minio, notifSvc)
 	h := handler.NewLeaveHandler(svc)
 
 	app.Get("/leave-requests/metadata", h.Metadata)

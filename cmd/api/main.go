@@ -131,18 +131,31 @@ func main() {
 		"duration": utils.Ms(time.Since(startTime)),
 	})
 
-	// ── Cron Scheduler ────────────────────────────────────────────
+	// ── Repositories ─────────────────────────────────────────────
 	attendanceRepo := repository.NewAttendanceRepository(dbInstance.GetDB())
+
+	// ── Notification Service ─────────────────────────────────────
+	pushRepo := repository.NewPushRepository(dbInstance.GetDB())
+	notifRepo := repository.NewNotificationRepository(dbInstance.GetDB())
+	empRepo := repository.NewEmployeeRepository(dbInstance.GetDB())
+	pushSvc := service.NewPushService(
+		env.Cfg.Vapid.PrivateKey,
+		env.Cfg.Vapid.PublicKey,
+		"mailto:wafa@example.com",
+	)
+	notifSvc := service.NewNotificationService(pushRepo, notifRepo, pushSvc, empRepo, attendanceRepo)
+
+	// ── Cron Scheduler ────────────────────────────────────────────
 	mutabaahRepo := repository.NewMutabaahRepository(dbInstance.GetDB())
 	dailyReportRepo := repository.NewDailyReportRepository(dbInstance.GetDB())
 	txManager := repository.NewTxManager(dbInstance.GetDB())
-	cronSvc := service.NewCronService(attendanceRepo, mutabaahRepo, dailyReportRepo, txManager)
+	cronSvc := service.NewCronService(attendanceRepo, mutabaahRepo, dailyReportRepo, txManager, notifSvc)
 	scheduler := cron.NewScheduler(cronSvc)
 	scheduler.Start()
 
 	// ── HTTP Server ────────────────────────────────────────────────
 	startTime = time.Now()
-	httpServer := router.SetupHTTPServer(dbInstance, redisInstance, minioClient)
+	httpServer := router.SetupHTTPServer(dbInstance, redisInstance, minioClient, notifSvc)
 	if httpServer != nil {
 		go func() {
 			if err := httpServer.Listen(":" + env.Cfg.Server.HTTPPort); err != nil && err != http.ErrServerClosed {

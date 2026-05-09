@@ -12,11 +12,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func BusinessTripRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient) {
+func BusinessTripRoutes(app *fiber.App, db *gorm.DB, minio storage.MinioClient, notifSvc service.NotificationService) {
 	repo := repository.NewBusinessTripRepository(db)
 	attendRepo := repository.NewAttendanceRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewBusinessTripService(repo, attendRepo, txManager, minio)
+	svc := service.NewBusinessTripService(repo, attendRepo, txManager, minio, notifSvc)
 	h := handler.NewBusinessTripHandler(svc)
 
 	trips := app.Group("/business-trips")

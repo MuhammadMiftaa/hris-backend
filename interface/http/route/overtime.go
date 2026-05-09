@@ -11,11 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func OvertimeRoutes(app *fiber.App, db *gorm.DB) {
+func OvertimeRoutes(app *fiber.App, db *gorm.DB, notifSvc service.NotificationService) {
 	repo := repository.NewOvertimeRepository(db)
 	attendRepo := repository.NewAttendanceRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewOvertimeService(repo, attendRepo, txManager)
+	svc := service.NewOvertimeService(repo, attendRepo, txManager, notifSvc)
 	h := handler.NewOvertimeHandler(svc)
 
 	ots := app.Group("/overtime-requests")

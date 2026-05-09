@@ -39,6 +39,7 @@ type leaveService struct {
 	attendRepo    repository.AttendanceRepository
 	txManager     repository.TxManager
 	minio         storage.MinioClient
+	notifSvc      NotificationService
 }
 
 func NewLeaveService(
@@ -47,6 +48,7 @@ func NewLeaveService(
 	attendRepo repository.AttendanceRepository,
 	txManager repository.TxManager,
 	minio storage.MinioClient,
+	notifSvc NotificationService,
 ) LeaveService {
 	return &leaveService{
 		repo:          repo,
@@ -54,6 +56,7 @@ func NewLeaveService(
 		attendRepo:    attendRepo,
 		txManager:     txManager,
 		minio:         minio,
+		notifSvc:      notifSvc,
 	}
 }
 
@@ -296,6 +299,16 @@ func (s *leaveService) CreateRequest(ctx context.Context, employeeID uint, roleL
 		return dto.LeaveRequestResponse{}, fmt.Errorf("commit tx: %w", err)
 	}
 
+	// Trigger approval notification (fire-and-forget)
+	if !isAdminSubmission {
+		if err := s.notifSvc.TriggerRequestApprovalNotification(ctx, "leave", created.ID, targetEmployeeID); err != nil {
+			logger.Error("failed to trigger leave approval notification", map[string]any{
+				"request_id": created.ID,
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	return s.GetRequestByID(ctx, created.ID)
 }
 
@@ -399,6 +412,16 @@ func (s *leaveService) ApproveRequest(ctx context.Context, approverID uint, requ
 		return dto.LeaveRequestResponse{}, err
 	}
 
+	// Trigger result notification to requester
+	if request != nil {
+		if err := s.notifSvc.TriggerApprovalResultNotification(ctx, "leave", requestID, request.EmployeeID, targetStatus); err != nil {
+			logger.Error("failed to trigger leave approval result notification", map[string]any{
+				"request_id": requestID,
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	return s.GetRequestByID(ctx, requestID)
 }
 
@@ -439,6 +462,17 @@ func (s *leaveService) RejectRequest(ctx context.Context, approverID uint, reque
 
 	if err := tx.Commit(); err != nil {
 		return dto.LeaveRequestResponse{}, err
+	}
+
+	// Trigger rejection notification to requester
+	request, _ := s.repo.GetRequestByID(ctx, nil, requestID)
+	if request != nil {
+		if err := s.notifSvc.TriggerApprovalResultNotification(ctx, "leave", requestID, request.EmployeeID, "rejected"); err != nil {
+			logger.Error("failed to trigger leave rejection notification", map[string]any{
+				"request_id": requestID,
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	return s.GetRequestByID(ctx, requestID)

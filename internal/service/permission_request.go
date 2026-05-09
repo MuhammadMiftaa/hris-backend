@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	logger "hris-backend/config/log"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -24,17 +25,20 @@ type permissionRequestService struct {
 	repo       repository.PermissionRequestRepository
 	attendRepo repository.AttendanceRepository
 	txManager  repository.TxManager
+	notifSvc   NotificationService
 }
 
 func NewPermissionRequestService(
 	repo repository.PermissionRequestRepository,
 	attendRepo repository.AttendanceRepository,
 	txManager repository.TxManager,
+	notifSvc NotificationService,
 ) PermissionRequestService {
 	return &permissionRequestService{
 		repo:       repo,
 		attendRepo: attendRepo,
 		txManager:  txManager,
+		notifSvc:   notifSvc,
 	}
 }
 
@@ -137,6 +141,16 @@ func (s *permissionRequestService) Create(ctx context.Context, employeeID uint, 
 		return dto.PermissionRequestResponse{}, err
 	}
 
+	// Trigger approval notification (fire-and-forget)
+	if !isAdminSubmission {
+		if err := s.notifSvc.TriggerRequestApprovalNotification(ctx, "permission", created.ID, targetEmployeeID); err != nil {
+			logger.Error("failed to trigger permission approval notification", map[string]any{
+				"request_id": created.ID,
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	return s.GetByID(ctx, created.ID)
 }
 
@@ -178,6 +192,16 @@ func (s *permissionRequestService) UpdateStatus(ctx context.Context, employeeID 
 
 	if err := tx.Commit(); err != nil {
 		return dto.PermissionRequestResponse{}, err
+	}
+
+	// Trigger result notification to requester
+	if perm != nil {
+		if err := s.notifSvc.TriggerApprovalResultNotification(ctx, "permission", id, perm.EmployeeID, req.Status); err != nil {
+			logger.Error("failed to trigger permission result notification", map[string]any{
+				"request_id": id,
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	return s.GetByID(ctx, id)

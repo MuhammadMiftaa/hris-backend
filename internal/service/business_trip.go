@@ -27,6 +27,7 @@ type businessTripService struct {
 	attendRepo repository.AttendanceRepository
 	txManager  repository.TxManager
 	minio      storage.MinioClient
+	notifSvc   NotificationService
 }
 
 func NewBusinessTripService(
@@ -34,12 +35,14 @@ func NewBusinessTripService(
 	attendRepo repository.AttendanceRepository,
 	txManager repository.TxManager,
 	minio storage.MinioClient,
+	notifSvc NotificationService,
 ) BusinessTripService {
 	return &businessTripService{
 		repo:       repo,
 		attendRepo: attendRepo,
 		txManager:  txManager,
 		minio:      minio,
+		notifSvc:   notifSvc,
 	}
 }
 
@@ -168,6 +171,16 @@ func (s *businessTripService) Create(ctx context.Context, employeeID uint, roleL
 		return dto.BusinessTripRequestResponse{}, err
 	}
 
+	// Trigger approval notification (fire-and-forget)
+	if !isAdminSubmission {
+		if err := s.notifSvc.TriggerRequestApprovalNotification(ctx, "business_trip", created.ID, targetEmployeeID); err != nil {
+			logger.Error("failed to trigger business trip approval notification", map[string]any{
+				"request_id": created.ID,
+				"error":      err.Error(),
+			})
+		}
+	}
+
 	return s.GetByID(ctx, created.ID)
 }
 
@@ -226,6 +239,16 @@ func (s *businessTripService) UpdateStatus(ctx context.Context, employeeID uint,
 
 	if err := tx.Commit(); err != nil {
 		return dto.BusinessTripRequestResponse{}, err
+	}
+
+	// Trigger result notification to requester
+	if trip != nil {
+		if err := s.notifSvc.TriggerApprovalResultNotification(ctx, "business_trip", id, trip.EmployeeID, req.Status); err != nil {
+			logger.Error("failed to trigger business trip result notification", map[string]any{
+				"request_id": id,
+				"error":      err.Error(),
+			})
+		}
 	}
 
 	return s.GetByID(ctx, id)

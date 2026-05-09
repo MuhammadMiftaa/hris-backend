@@ -17,7 +17,14 @@ func InternalRoutes(app *fiber.App, db *gorm.DB) {
 	mutaRepo := repository.NewMutabaahRepository(db)
 	dailyRepo := repository.NewDailyReportRepository(db)
 	txManager := repository.NewTxManager(db)
-	cronSvc := service.NewCronService(attendRepo, mutaRepo, dailyRepo, txManager)
+
+	// Internal routes don't need notification service; create minimal cron service
+	pushRepo := repository.NewPushRepository(db)
+	notifRepo := repository.NewNotificationRepository(db)
+	empRepo := repository.NewEmployeeRepository(db)
+	pushSvc := service.NewPushService("", "", "")
+	notifSvc := service.NewNotificationService(pushRepo, notifRepo, pushSvc, empRepo, attendRepo)
+	cronSvc := service.NewCronService(attendRepo, mutaRepo, dailyRepo, txManager, notifSvc)
 	cronH := handler.NewCronHandler(cronSvc)
 
 	internal := app.Group("/internal")

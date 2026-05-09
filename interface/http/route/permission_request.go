@@ -11,11 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func PermissionRequestRoutes(app *fiber.App, db *gorm.DB) {
+func PermissionRequestRoutes(app *fiber.App, db *gorm.DB, notifSvc service.NotificationService) {
 	repo := repository.NewPermissionRequestRepository(db)
 	attendRepo := repository.NewAttendanceRepository(db)
 	txManager := repository.NewTxManager(db)
-	svc := service.NewPermissionRequestService(repo, attendRepo, txManager)
+	svc := service.NewPermissionRequestService(repo, attendRepo, txManager, notifSvc)
 	h := handler.NewPermissionRequestHandler(svc)
 
 	perms := app.Group("/permission-requests")

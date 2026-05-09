@@ -18,6 +18,9 @@ type CronService interface {
 	RunDailyAbsentMark(ctx context.Context, date string) error
 	RunDailyMutabaahMark(ctx context.Context, date string) error
 	RunDailyReportMark(ctx context.Context, date string) error
+	GenerateDailyPushReminders(ctx context.Context, date string) error
+	SendMutabaahReminders(ctx context.Context, date string) error
+	SendPendingNotifications(ctx context.Context) error
 }
 
 type cronService struct {
@@ -25,6 +28,7 @@ type cronService struct {
 	mutabaah      repository.MutabaahRepository
 	dailyReport   repository.DailyReportRepository
 	txManager     repository.TxManager
+	notifSvc      NotificationService
 }
 
 func NewCronService(
@@ -32,12 +36,14 @@ func NewCronService(
 	mutabaah repository.MutabaahRepository,
 	dailyReport repository.DailyReportRepository,
 	txManager repository.TxManager,
+	notifSvc NotificationService,
 ) CronService {
 	return &cronService{
 		attendRepo:  attendRepo,
 		mutabaah:    mutabaah,
 		dailyReport: dailyReport,
 		txManager:   txManager,
+		notifSvc:    notifSvc,
 	}
 }
 
@@ -144,6 +150,20 @@ func (s *cronService) RunDailyAbsentMark(ctx context.Context, date string) error
 		"marked":  len(logs),
 		"skipped": skipped,
 	})
+
+	// Trigger absent alerts for marked absent employees
+	for _, log := range logs {
+		if log.Status == model.AttendanceAbsent {
+			if err := s.notifSvc.TriggerAbsentAlert(ctx, log.EmployeeID, date); err != nil {
+				logger.Error("cron: failed to trigger absent alert", map[string]any{
+					"employee_id": log.EmployeeID,
+					"date":        date,
+					"error":       err.Error(),
+				})
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -259,4 +279,66 @@ func (s *cronService) RunDailyReportMark(ctx context.Context, date string) error
 		"marked": len(logs),
 	})
 	return nil
+}
+
+// GenerateDailyPushReminders — generate clock in/out reminders untuk besok
+func (s *cronService) GenerateDailyPushReminders(ctx context.Context, date string) error {
+	tomorrow := utils.TodayDate()
+	logger.Info("cron: generate daily push reminders", map[string]any{"date": tomorrow})
+
+	// Get all employees with active schedule tomorrow
+	employeeIDs, err := s.attendRepo.GetEmployeesWithActiveScheduleWithoutLog(ctx, nil, tomorrow)
+	if err != nil {
+		return fmt.Errorf("cron: get employees with schedule: %w", err)
+	}
+
+	for _, empID := range employeeIDs {
+		shift, err := s.attendRepo.GetActiveSchedule(ctx, nil, empID, tomorrow)
+		if err != nil || shift == nil || !shift.IsWorkingDay {
+			continue
+		}
+
+		// Clock in reminder (10 min before clock_in_end)
+		if shift.ClockInEnd != nil {
+			if err := s.notifSvc.TriggerClockInReminder(ctx, empID, tomorrow, *shift.ClockInEnd); err != nil {
+				logger.Error("cron: clock in reminder failed", map[string]any{
+					"employee_id": empID,
+					"error":       err.Error(),
+				})
+			}
+		}
+
+		// Clock out reminder (10 min before clock_out_end)
+		if shift.ClockOutEnd != nil {
+			if err := s.notifSvc.TriggerClockOutReminder(ctx, empID, tomorrow, *shift.ClockOutEnd); err != nil {
+				logger.Error("cron: clock out reminder failed", map[string]any{
+					"employee_id": empID,
+					"error":       err.Error(),
+				})
+			}
+		}
+	}
+
+	logger.Info("cron: daily push reminders generated", map[string]any{
+		"date":     tomorrow,
+		"employees": len(employeeIDs),
+	})
+	return nil
+}
+
+// SendMutabaahReminders — kirim reminder mutabaah ke pegawai yang belum submit
+func (s *cronService) SendMutabaahReminders(ctx context.Context, date string) error {
+	logger.Info("cron: send mutabaah reminders", map[string]any{"date": date})
+
+	if err := s.notifSvc.SendMutabaahReminders(ctx, date); err != nil {
+		return fmt.Errorf("cron: send mutabaah reminders: %w", err)
+	}
+
+	logger.Info("cron: mutabaah reminders sent", map[string]any{"date": date})
+	return nil
+}
+
+// SendPendingNotifications — polling DB setiap menit untuk kirim push pending
+func (s *cronService) SendPendingNotifications(ctx context.Context) error {
+	return s.notifSvc.SendPendingNotifications(ctx)
 }
