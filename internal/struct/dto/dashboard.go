@@ -91,6 +91,36 @@ type NotClockedInDTO struct {
 	ShiftStart     *string `json:"shift_start"`
 }
 
+// TeamEmployeeAttendanceDTO — pegawai dengan status kehadiran & mutabaah hari ini
+type TeamEmployeeAttendanceDTO struct {
+	EmployeeID       uint    `json:"employee_id"`
+	EmployeeName     string  `json:"employee_name"`
+	DepartmentName   *string `json:"department_name"`
+	JobPosition      string  `json:"job_position"`
+	AttendanceStatus string  `json:"attendance_status"` // present, late, absent, leave, business_trip, half_day
+	MutabaahStatus   string  `json:"mutabaah_status"`   // submitted, not_submitted, not_applicable
+}
+
+// TeamEmployeeRequestDTO — pengajuan cuti/izin/tugas pegawai hari ini
+type TeamEmployeeRequestDTO struct {
+	RequestID     uint   `json:"request_id"`
+	EmployeeID    uint   `json:"employee_id"`
+	EmployeeName  string `json:"employee_name"`
+	JobPosition   string `json:"job_position"`
+	RequestType   string `json:"request_type"`   // leave, permission, business_trip
+	CreatedAt     string `json:"created_at"`
+	RequestedDate string `json:"requested_date"`
+	Status        string `json:"status"`
+	Label         string `json:"label"`
+}
+
+// NotClockedOutDTO — pegawai yang sudah clock in tapi belum clock out setelah window jam pulang
+type NotClockedOutDTO struct {
+	EmployeeID     uint    `json:"employee_id"`
+	EmployeeName   string  `json:"employee_name"`
+	DepartmentName *string `json:"department_name"`
+}
+
 type ExpiringContractDTO struct {
 	EmployeeID     uint   `json:"employee_id"`
 	EmployeeName   string `json:"employee_name"`
@@ -100,13 +130,28 @@ type ExpiringContractDTO struct {
 	DaysRemaining  int    `json:"days_remaining"`
 }
 
+// TeamDashboardResponse — data untuk tab Tim
+type TeamDashboardResponse struct {
+	TeamAttendance         TeamAttendanceSummaryDTO    `json:"team_attendance"`
+	TeamMutabaah           TeamMutabaahSummaryDTO      `json:"team_mutabaah"`
+	NotClockedIn           []NotClockedInDTO           `json:"not_clocked_in"`
+	NotClockedOut          []NotClockedOutDTO          `json:"not_clocked_out"`
+	EmployeeAttendanceList []TeamEmployeeAttendanceDTO `json:"employee_attendance_list"`
+	EmployeeRequestList    []TeamEmployeeRequestDTO    `json:"employee_request_list"`
+}
+
+// ReportsDashboardResponse — data untuk tab Laporan
+type ReportsDashboardResponse struct {
+	ApprovalQueue     []ApprovalQueueItemDTO `json:"approval_queue"`
+	ApprovalCounts    ApprovalCountsDTO      `json:"approval_counts"`
+	ExpiringContracts []ExpiringContractDTO  `json:"expiring_contracts"`
+}
+
+// HRDDashboardResponse — DEPRECATED, gunakan TeamDashboardResponse + ReportsDashboardResponse
+// Tetap dipertahankan untuk backward compatibility endpoint /dashboard/hrd
 type HRDDashboardResponse struct {
-	ApprovalQueue     []ApprovalQueueItemDTO   `json:"approval_queue"`
-	ApprovalCounts    ApprovalCountsDTO        `json:"approval_counts"`
-	TeamAttendance    TeamAttendanceSummaryDTO `json:"team_attendance"`
-	TeamMutabaah      TeamMutabaahSummaryDTO   `json:"team_mutabaah"`
-	NotClockedIn      []NotClockedInDTO        `json:"not_clocked_in"`
-	ExpiringContracts []ExpiringContractDTO    `json:"expiring_contracts"`
+	Team    TeamDashboardResponse    `json:"team"`
+	Reports ReportsDashboardResponse `json:"reports"`
 }
 
 // RankingEntryDTO — satu entry ranking generik

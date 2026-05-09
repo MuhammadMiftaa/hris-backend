@@ -33,7 +33,7 @@ func (h *DashboardHandler) GetEmployeeDashboard(c *fiber.Ctx) error {
 	})
 }
 
-// GetHRDDashboard — GET /dashboard/hrd
+// GetHRDDashboard — GET /dashboard/hrd (DEPRECATED)
 func (h *DashboardHandler) GetHRDDashboard(c *fiber.Ctx) error {
 	account := getAccountFromCtx(c)
 
@@ -46,6 +46,36 @@ func (h *DashboardHandler) GetHRDDashboard(c *fiber.Ctx) error {
 		Status:     true,
 		StatusCode: 200,
 		Message:    "hrd dashboard",
+		Data:       res,
+	})
+}
+
+// GetTeamDashboard — GET /dashboard/team
+func (h *DashboardHandler) GetTeamDashboard(c *fiber.Ctx) error {
+	account := getAccountFromCtx(c)
+	res, err := h.service.GetTeamDashboard(c.Context(), account.EmployeeID)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "Team dashboard fetched",
+		Data:       res,
+	})
+}
+
+// GetReportsDashboard — GET /dashboard/reports
+func (h *DashboardHandler) GetReportsDashboard(c *fiber.Ctx) error {
+	account := getAccountFromCtx(c)
+	res, err := h.service.GetReportsDashboard(c.Context(), account.EmployeeID)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(dto.APIResponse{
+		Status:     true,
+		StatusCode: 200,
+		Message:    "Reports dashboard fetched",
 		Data:       res,
 	})
 }

@@ -30,6 +30,7 @@ func NewLeaveTypeRepository(db *gorm.DB) LeaveTypeRepository {
 func (r *leaveTypeRepository) GetAllLeaveTypes(ctx context.Context, params dto.LeaveTypeListParams) (dto.PaginatedResponse[dto.LeaveTypeResponse], error) {
 	baseQuery := `
 		FROM leave_types lt
+		LEFT JOIN leave_types parent_lt ON parent_lt.id = lt.parent_leave_type_id AND parent_lt.deleted_at IS NULL
 		WHERE lt.deleted_at IS NULL
 	`
 	args := []interface{}{}
@@ -59,6 +60,16 @@ func (r *leaveTypeRepository) GetAllLeaveTypes(ctx context.Context, params dto.L
 		args = append(args, "%"+*params.MaxDurationPerRequest+"%")
 	}
 
+	if params.ParentLeaveTypeID != nil {
+		baseQuery += " AND lt.parent_leave_type_id = ?"
+		args = append(args, *params.ParentLeaveTypeID)
+	}
+
+	if params.ParentLeaveTypeName != nil && *params.ParentLeaveTypeName != "" {
+		baseQuery += " AND parent_lt.name ILIKE ?"
+		args = append(args, "%"+*params.ParentLeaveTypeName+"%")
+	}
+
 	var total int
 	if err := r.db.WithContext(ctx).Raw("SELECT COUNT(*) "+baseQuery, args...).Scan(&total).Error; err != nil {
 		return dto.PaginatedResponse[dto.LeaveTypeResponse]{}, err
@@ -71,7 +82,8 @@ func (r *leaveTypeRepository) GetAllLeaveTypes(ctx context.Context, params dto.L
 			lt.max_occurrences_per_year,
 			lt.max_total_duration_per_year,
 			lt.max_per_month, lt.parent_leave_type_id, lt.deduct_days,
-			lt.created_at, lt.updated_at
+			lt.created_at, lt.updated_at,
+			parent_lt.name AS parent_leave_type_name
 	` + baseQuery
 
 	selectQuery += utils.BuildSortClause("leave_type", params.SortBy, params.GetSortDir(), "lt.name ASC")
@@ -103,14 +115,16 @@ func (r *leaveTypeRepository) GetLeaveTypeByID(ctx context.Context, id string) (
 	var lt dto.LeaveTypeResponse
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			id, name, category, requires_document, requires_document_type,
-			max_duration_per_request,
-			max_occurrences_per_year,
-			max_total_duration_per_year,
-			max_per_month, parent_leave_type_id, deduct_days,
-			created_at, updated_at
-		FROM leave_types
-		WHERE deleted_at IS NULL AND id = ?
+			lt.id, lt.name, lt.category, lt.requires_document, lt.requires_document_type,
+			lt.max_duration_per_request,
+			lt.max_occurrences_per_year,
+			lt.max_total_duration_per_year,
+			lt.max_per_month, lt.parent_leave_type_id, lt.deduct_days,
+			lt.created_at, lt.updated_at,
+			parent_lt.name AS parent_leave_type_name
+		FROM leave_types lt
+		LEFT JOIN leave_types parent_lt ON parent_lt.id = lt.parent_leave_type_id AND parent_lt.deleted_at IS NULL
+		WHERE lt.deleted_at IS NULL AND lt.id = ?
 	`, id).Scan(&lt).Error; err != nil {
 		return dto.LeaveTypeResponse{}, err
 	}

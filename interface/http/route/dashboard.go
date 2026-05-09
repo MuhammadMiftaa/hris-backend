@@ -23,8 +23,14 @@ func DashboardRoutes(app *fiber.App, db *gorm.DB) {
 		// /dashboard/employee
 		dashboard.Get("/employee", middleware.RBACMiddleware(data.PERM_HomeEmployeeRead), h.GetEmployeeDashboard)
 
-		// /dashboard/hrd
+		// /dashboard/hrd (DEPRECATED)
 		dashboard.Get("/hrd", middleware.RBACMiddleware(data.PERM_HomeAdminRead), h.GetHRDDashboard)
+
+		// /dashboard/team (BARU)
+		dashboard.Get("/team", middleware.RBACMiddleware(data.PERM_HomeEmployeeRead), h.GetTeamDashboard)
+
+		// /dashboard/reports (BARU)
+		dashboard.Get("/reports", middleware.RBACMiddleware(data.PERM_HomeAdminRead), h.GetReportsDashboard)
 
 		// /dashboard/rankings
 		dashboard.Get("/rankings", middleware.RBACMiddleware(data.PERM_HomeEmployeeRead), h.GetRankings)

@@ -19,7 +19,6 @@ type DashboardRepository interface {
 	GetApprovalCounts(ctx context.Context, approverID uint) (dto.ApprovalCountsDTO, error)
 	GetTeamAttendanceSummary(ctx context.Context, date string) (dto.TeamAttendanceSummaryDTO, error)
 	GetTeamMutabaahSummary(ctx context.Context, date string) (dto.TeamMutabaahSummaryDTO, error)
-	GetNotClockedIn(ctx context.Context, date string) ([]dto.NotClockedInDTO, error)
 	GetExpiringContracts(ctx context.Context, days int) ([]dto.ExpiringContractDTO, error)
 	GetFastestArrivalRanking(ctx context.Context, date string, limit int) ([]dto.RankingEntryDTO, error)
 	GetTopTilawahByDepartment(ctx context.Context, date string, limit int) ([]dto.DepartmentRankingDTO, error)
@@ -27,6 +26,11 @@ type DashboardRepository interface {
 	GetRecentAttendanceMeta(ctx context.Context, employeeID *uint) ([]dto.Meta, error)
 	GetLeaveTypeMeta(ctx context.Context) ([]dto.Meta, error)
 	GetEmployeeMeta(ctx context.Context, employeeID *uint) ([]dto.Meta, error)
+	GetEmployeeDepartmentID(ctx context.Context, employeeID uint) (*uint, error)
+	GetTeamEmployeeAttendanceList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeAttendanceDTO, error)
+	GetTeamEmployeeRequestList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeRequestDTO, error)
+	GetNotClockedIn(ctx context.Context, date string, departmentID *uint) ([]dto.NotClockedInDTO, error)
+	GetNotClockedOut(ctx context.Context, date string, departmentID *uint) ([]dto.NotClockedOutDTO, error)
 }
 
 type dashboardRepository struct {
@@ -273,8 +277,26 @@ func (r *dashboardRepository) GetTeamMutabaahSummary(ctx context.Context, date s
 	return summary, err
 }
 
-func (r *dashboardRepository) GetNotClockedIn(ctx context.Context, date string) ([]dto.NotClockedInDTO, error) {
+func (r *dashboardRepository) GetEmployeeDepartmentID(ctx context.Context, employeeID uint) (*uint, error) {
+	var deptID *uint
+	err := r.getDB(ctx).Raw(`
+		SELECT department_id FROM employees
+		WHERE id = ? AND deleted_at IS NULL
+		LIMIT 1
+	`, employeeID).Scan(&deptID).Error
+	return deptID, err
+}
+
+func (r *dashboardRepository) GetNotClockedIn(ctx context.Context, date string, departmentID *uint) ([]dto.NotClockedInDTO, error) {
 	var list []dto.NotClockedInDTO
+	args := []interface{}{date, date, date, date}
+
+	deptFilter := ""
+	if departmentID != nil {
+		deptFilter = " AND e.department_id = ?"
+		args = append(args, *departmentID)
+	}
+
 	err := r.getDB(ctx).Raw(`
 		SELECT
 			e.id             AS employee_id,
@@ -302,9 +324,10 @@ func (r *dashboardRepository) GetNotClockedIn(ctx context.Context, date string) 
 			SELECT employee_id FROM attendance_logs
 			WHERE attendance_date = ?::DATE AND deleted_at IS NULL
 		  )
+		`+deptFilter+`
 		ORDER BY std.clock_in_start ASC
 		LIMIT 10
-	`, date, date, date, date).Scan(&list).Error
+	`, args...).Scan(&list).Error
 	return list, err
 }
 
@@ -524,4 +547,179 @@ func (r *dashboardRepository) GetEmployeeMeta(ctx context.Context, employeeID *u
 	}
 	err := r.db.Raw(query, args...).Scan(&meta).Error
 	return meta, err
+}
+
+func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeAttendanceDTO, error) {
+	var list []dto.TeamEmployeeAttendanceDTO
+	args := []interface{}{date, date, date, date, date}
+
+	deptFilter := ""
+	if departmentID != nil {
+		deptFilter = " AND e.department_id = ?"
+		args = append(args, *departmentID)
+	}
+
+	err := r.getDB(ctx).Raw(`
+		SELECT
+			e.id               AS employee_id,
+			e.full_name        AS employee_name,
+			d.name             AS department_name,
+			e.job_position_title AS job_position,
+			COALESCE(al.status::TEXT, 'absent') AS attendance_status,
+			CASE
+				WHEN ml.id IS NOT NULL AND ml.is_submitted = TRUE THEN 'submitted'
+				WHEN ml.id IS NOT NULL AND ml.is_submitted = FALSE THEN 'not_submitted'
+				ELSE 'not_applicable'
+			END AS mutabaah_status
+		FROM employees e
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		INNER JOIN employee_schedules es
+			ON es.employee_id = e.id
+			AND es.is_active = TRUE
+			AND es.effective_date <= ?::DATE
+			AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+			AND es.deleted_at IS NULL
+		INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		INNER JOIN shift_template_details std
+			ON std.shift_template_id = st.id
+			AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+			AND std.is_working_day = TRUE
+			AND std.deleted_at IS NULL
+		LEFT JOIN attendance_logs al
+			ON al.employee_id = e.id
+			AND al.attendance_date = ?::DATE
+			AND al.deleted_at IS NULL
+		LEFT JOIN mutabaah_logs ml
+			ON ml.employee_id = e.id
+			AND ml.log_date = ?::DATE
+			AND ml.deleted_at IS NULL
+		WHERE e.deleted_at IS NULL
+		`+deptFilter+`
+		ORDER BY e.full_name ASC
+	`, args...).Scan(&list).Error
+	if list == nil {
+		list = []dto.TeamEmployeeAttendanceDTO{}
+	}
+	return list, err
+}
+
+func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeRequestDTO, error) {
+	var list []dto.TeamEmployeeRequestDTO
+	args := []interface{}{date, date, date, date, date}
+
+	deptFilter := ""
+	if departmentID != nil {
+		deptFilter = " AND e.department_id = ?"
+		args = append(args, *departmentID)
+	}
+
+	err := r.getDB(ctx).Raw(`
+		SELECT * FROM (
+			SELECT
+				lr.id AS request_id,
+				lr.employee_id,
+				e.full_name AS employee_name,
+				e.job_position_title AS job_position,
+				'leave' AS request_type,
+				TO_CHAR(lr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+				TO_CHAR(lr.start_date, 'YYYY-MM-DD') AS requested_date,
+				lr.status::TEXT AS status,
+				(COALESCE(lt.name, 'Cuti') || ' — ' || lr.total_days || ' hari') AS label
+			FROM leave_requests lr
+			JOIN employees e ON e.id = lr.employee_id AND e.deleted_at IS NULL
+			LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id AND lt.deleted_at IS NULL
+			WHERE lr.deleted_at IS NULL
+			  AND lr.start_date <= ?::DATE
+			  AND lr.end_date >= ?::DATE
+			  `+deptFilter+`
+
+			UNION ALL
+
+			SELECT
+				pr.id AS request_id,
+				pr.employee_id,
+				e.full_name AS employee_name,
+				e.job_position_title AS job_position,
+				'permission' AS request_type,
+				TO_CHAR(pr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+				TO_CHAR(pr.date, 'YYYY-MM-DD') AS requested_date,
+				pr.status::TEXT AS status,
+				'Izin — ' || COALESCE(pr.reason, '') AS label
+			FROM permission_requests pr
+			JOIN employees e ON e.id = pr.employee_id AND e.deleted_at IS NULL
+			WHERE pr.deleted_at IS NULL
+			  AND pr.date = ?::DATE
+			  `+deptFilter+`
+
+			UNION ALL
+
+			SELECT
+				bt.id AS request_id,
+				bt.employee_id,
+				e.full_name AS employee_name,
+				e.job_position_title AS job_position,
+				'business_trip' AS request_type,
+				TO_CHAR(bt.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+				TO_CHAR(bt.start_date, 'YYYY-MM-DD') AS requested_date,
+				bt.status::TEXT AS status,
+				'Tugas — ' || COALESCE(bt.destination, '') AS label
+			FROM business_trip_requests bt
+			JOIN employees e ON e.id = bt.employee_id AND e.deleted_at IS NULL
+			WHERE bt.deleted_at IS NULL
+			  AND bt.start_date <= ?::DATE
+			  AND bt.end_date >= ?::DATE
+			  `+deptFilter+`
+		) sub
+		ORDER BY created_at DESC
+	`, args...).Scan(&list).Error
+	if list == nil {
+		list = []dto.TeamEmployeeRequestDTO{}
+	}
+	return list, err
+}
+
+func (r *dashboardRepository) GetNotClockedOut(ctx context.Context, date string, departmentID *uint) ([]dto.NotClockedOutDTO, error) {
+	var list []dto.NotClockedOutDTO
+	args := []interface{}{date, date, date, date}
+
+	deptFilter := ""
+	if departmentID != nil {
+		deptFilter = " AND e.department_id = ?"
+		args = append(args, *departmentID)
+	}
+
+	err := r.getDB(ctx).Raw(`
+		SELECT
+			e.id              AS employee_id,
+			e.full_name       AS employee_name,
+			d.name            AS department_name
+		FROM employees e
+		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		INNER JOIN employee_schedules es
+			ON es.employee_id = e.id
+			AND es.is_active = TRUE
+			AND es.effective_date <= ?::DATE
+			AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+			AND es.deleted_at IS NULL
+		INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+		INNER JOIN shift_template_details std
+			ON std.shift_template_id = st.id
+			AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+			AND std.is_working_day = TRUE
+			AND std.deleted_at IS NULL
+		INNER JOIN attendance_logs al
+			ON al.employee_id = e.id
+			AND al.attendance_date = ?::DATE
+			AND al.clock_in_at IS NOT NULL
+			AND al.clock_out_at IS NULL
+			AND al.deleted_at IS NULL
+		WHERE e.deleted_at IS NULL
+		  AND CURRENT_TIME > std.clock_out_end
+		  `+deptFilter+`
+		ORDER BY std.clock_out_end ASC
+	`, args...).Scan(&list).Error
+	if list == nil {
+		list = []dto.NotClockedOutDTO{}
+	}
+	return list, err
 }

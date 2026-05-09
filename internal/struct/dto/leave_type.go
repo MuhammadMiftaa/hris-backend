@@ -17,6 +17,7 @@ type LeaveTypeResponse struct {
 	MaxTotalDurationPerYear *float64                `json:"max_total_duration_per_year"`
 	MaxPerMonth             *float64                `json:"max_per_month"`
 	ParentLeaveTypeID       *uint                   `json:"parent_leave_type_id"`
+	ParentLeaveTypeName     *string                 `json:"parent_leave_type_name"`
 	DeductDays              float64                 `json:"deduct_days"`
 	CreatedAt               time.Time               `json:"created_at"`
 	UpdatedAt               *time.Time              `json:"updated_at"`
@@ -59,4 +60,6 @@ type LeaveTypeListParams struct {
 	Name                    *string `query:"name"`
 	Category                *string `query:"category"`
 	RequiresDocument        *bool   `query:"requires_document"`
+	ParentLeaveTypeID       *uint   `query:"parent_leave_type_id"`
+	ParentLeaveTypeName     *string `query:"parent_leave_type_name"`
 }

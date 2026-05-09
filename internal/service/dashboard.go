@@ -12,7 +12,9 @@ import (
 
 type DashboardService interface {
 	GetEmployeeDashboard(ctx context.Context, accountID uint, isTrainer bool) (dto.EmployeeDashboardResponse, error)
-	GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error)
+	GetTeamDashboard(ctx context.Context, hrID uint) (dto.TeamDashboardResponse, error)
+	GetReportsDashboard(ctx context.Context, hrID uint) (dto.ReportsDashboardResponse, error)
+	GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error) // DEPRECATED alias
 	GetRankings(ctx context.Context) (dto.DashboardRankingsResponse, error)
 	GetDashboardMetadata(ctx context.Context, employeeID *uint) (dto.DashboardMetadataResponse, error)
 }
@@ -120,33 +122,93 @@ func (s *dashboardService) buildMutabaahTodayStatus(ctx context.Context, employe
 	}
 }
 
-func (s *dashboardService) GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error) {
+func (s *dashboardService) GetTeamDashboard(ctx context.Context, hrID uint) (dto.TeamDashboardResponse, error) {
 	today := utils.TodayDate()
 
-	queue, _ := s.dashboardRepo.GetApprovalQueue(ctx, hrID)
-	counts, _ := s.dashboardRepo.GetApprovalCounts(ctx, hrID)
+	// Auto-infer department dari employee yang login
+	deptID, _ := s.dashboardRepo.GetEmployeeDepartmentID(ctx, hrID)
+
 	teamAttend, _ := s.dashboardRepo.GetTeamAttendanceSummary(ctx, today)
 	teamMutabaah, _ := s.dashboardRepo.GetTeamMutabaahSummary(ctx, today)
-	notClockedIn, _ := s.dashboardRepo.GetNotClockedIn(ctx, today)
+	notClockedIn, _ := s.dashboardRepo.GetNotClockedIn(ctx, today, deptID)
+	notClockedOut, _ := s.dashboardRepo.GetNotClockedOut(ctx, today, deptID)
+	employeeList, _ := s.dashboardRepo.GetTeamEmployeeAttendanceList(ctx, today, deptID)
+	requestList, _ := s.dashboardRepo.GetTeamEmployeeRequestList(ctx, today, deptID)
+
+	if notClockedIn == nil {
+		notClockedIn = []dto.NotClockedInDTO{}
+	}
+	if notClockedOut == nil {
+		notClockedOut = []dto.NotClockedOutDTO{}
+	}
+	if employeeList == nil {
+		employeeList = []dto.TeamEmployeeAttendanceDTO{}
+	}
+	if requestList == nil {
+		requestList = []dto.TeamEmployeeRequestDTO{}
+	}
+
+	return dto.TeamDashboardResponse{
+		TeamAttendance:         teamAttend,
+		TeamMutabaah:           teamMutabaah,
+		NotClockedIn:           notClockedIn,
+		NotClockedOut:          notClockedOut,
+		EmployeeAttendanceList: employeeList,
+		EmployeeRequestList:    requestList,
+	}, nil
+}
+
+func (s *dashboardService) GetReportsDashboard(ctx context.Context, hrID uint) (dto.ReportsDashboardResponse, error) {
+	queue, _ := s.dashboardRepo.GetApprovalQueue(ctx, hrID)
+	counts, _ := s.dashboardRepo.GetApprovalCounts(ctx, hrID)
 	expiring, _ := s.dashboardRepo.GetExpiringContracts(ctx, 30)
 
 	if queue == nil {
 		queue = []dto.ApprovalQueueItemDTO{}
 	}
-	if notClockedIn == nil {
-		notClockedIn = []dto.NotClockedInDTO{}
-	}
 	if expiring == nil {
 		expiring = []dto.ExpiringContractDTO{}
 	}
 
-	return dto.HRDDashboardResponse{
+	return dto.ReportsDashboardResponse{
 		ApprovalQueue:     queue,
 		ApprovalCounts:    counts,
-		TeamAttendance:    teamAttend,
-		TeamMutabaah:      teamMutabaah,
-		NotClockedIn:      notClockedIn,
 		ExpiringContracts: expiring,
+	}, nil
+}
+
+// DEPRECATED — menggabungkan TeamDashboard + ReportsDashboard (tidak ter-filter department)
+func (s *dashboardService) GetHRDDashboard(ctx context.Context, hrID uint) (dto.HRDDashboardResponse, error) {
+	today := utils.TodayDate()
+
+	teamAttend, _ := s.dashboardRepo.GetTeamAttendanceSummary(ctx, today)
+	teamMutabaah, _ := s.dashboardRepo.GetTeamMutabaahSummary(ctx, today)
+	notClockedIn, _ := s.dashboardRepo.GetNotClockedIn(ctx, today, nil)
+	notClockedOut, _ := s.dashboardRepo.GetNotClockedOut(ctx, today, nil)
+	employeeList, _ := s.dashboardRepo.GetTeamEmployeeAttendanceList(ctx, today, nil)
+	requestList, _ := s.dashboardRepo.GetTeamEmployeeRequestList(ctx, today, nil)
+
+	if notClockedIn == nil { notClockedIn = []dto.NotClockedInDTO{} }
+	if notClockedOut == nil { notClockedOut = []dto.NotClockedOutDTO{} }
+	if employeeList == nil { employeeList = []dto.TeamEmployeeAttendanceDTO{} }
+	if requestList == nil { requestList = []dto.TeamEmployeeRequestDTO{} }
+
+	team := dto.TeamDashboardResponse{
+		TeamAttendance:         teamAttend,
+		TeamMutabaah:           teamMutabaah,
+		NotClockedIn:           notClockedIn,
+		NotClockedOut:          notClockedOut,
+		EmployeeAttendanceList: employeeList,
+		EmployeeRequestList:    requestList,
+	}
+
+	reports, err := s.GetReportsDashboard(ctx, hrID)
+	if err != nil {
+		return dto.HRDDashboardResponse{}, err
+	}
+	return dto.HRDDashboardResponse{
+		Team:    team,
+		Reports: reports,
 	}, nil
 }
 
