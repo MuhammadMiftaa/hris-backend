@@ -30,9 +30,9 @@ type AttendanceSummaryDTO struct {
 type LeaveBalanceSummaryDTO struct {
 	LeaveTypeID   uint   `json:"leave_type_id"`
 	LeaveTypeName string `json:"leave_type_name"`
-	TotalQuota    *int   `json:"total_quota"`
-	Used          int    `json:"used"`
-	Remaining     *int   `json:"remaining"`
+	TotalQuota    *float64   `json:"total_quota"`
+	Used          float64    `json:"used"`
+	Remaining     *float64   `json:"remaining"`
 }
 
 type EmployeeRequestDTO struct {

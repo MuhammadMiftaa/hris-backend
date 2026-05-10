@@ -114,7 +114,10 @@ func LoadNative() ([]string, error) {
 	lookupEnv("GOTENBERG_URL", &Cfg.Gotenberg.URL, &missing)
 
 	lookupEnv("VAPID_PRIVATE_KEY", &Cfg.Vapid.PrivateKey, &missing)
-	lookupEnv("VAPID_PUBLIC_KEY", &Cfg.Vapid.PublicKey, &missing)
+	// VAPID_PUBLIC_KEY is optional — will be derived from private key if not set
+	if val, ok := os.LookupEnv("VAPID_PUBLIC_KEY"); ok {
+		Cfg.Vapid.PublicKey = val
+	}
 
 	lookupEnv("INDONESIA_HOLIDAY_API_KEY", &Cfg.ExternalAPI.IndonesiaHolidayAPIKey, &missing)
 	lookupEnv("INDONESIA_HOLIDAY_API_URL", &Cfg.ExternalAPI.IndonesiaHolidayAPIURL, &missing)
