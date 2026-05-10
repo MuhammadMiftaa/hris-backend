@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
-	"log"
 	"time"
 
+	"hris-backend/config/log"
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/utils"
@@ -217,15 +217,15 @@ func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankin
 
 	fastest, err := s.dashboardRepo.GetFastestArrivalRanking(ctx, today, 5)
 	if err != nil {
-		log.Printf("[WARN] GetFastestArrivalRanking failed: %v", err)
+		log.Error("[WARN] GetFastestArrivalRanking failed", map[string]any{"error": err})
 	}
 	tilawah, err := s.dashboardRepo.GetTopTilawahByDepartment(ctx, today, 5)
 	if err != nil {
-		log.Printf("[WARN] GetTopTilawahByDepartment failed: %v", err)
+		log.Error("[WARN] GetTopTilawahByDepartment failed", map[string]any{"error": err})
 	}
 	fastestMutabaah, err := s.dashboardRepo.GetFastestMutabaahRanking(ctx, today, 5)
 	if err != nil {
-		log.Printf("[WARN] GetFastestMutabaahRanking failed: %v", err)
+		log.Error("[WARN] GetFastestMutabaahRanking failed", map[string]any{"error": err})
 	}
 
 	if fastest == nil {
@@ -248,15 +248,15 @@ func (s *dashboardService) GetRankings(ctx context.Context) (dto.DashboardRankin
 func (s *dashboardService) GetDashboardMetadata(ctx context.Context, employeeID *uint) (dto.DashboardMetadataResponse, error) {
 	leaveTypeMeta, err := s.dashboardRepo.GetLeaveTypeMeta(ctx)
 	if err != nil {
-		log.Printf("[WARN] GetLeaveTypeMeta failed: %v", err)
+		log.Error("[WARN] GetLeaveTypeMeta failed", map[string]any{"error": err})
 	}
 	recentAttendanceMeta, err := s.dashboardRepo.GetRecentAttendanceMeta(ctx, employeeID)
 	if err != nil {
-		log.Printf("[WARN] GetRecentAttendanceMeta failed: %v", err)
+		log.Error("[WARN] GetRecentAttendanceMeta failed", map[string]any{"error": err})
 	}
 	employeeMeta, err := s.dashboardRepo.GetEmployeeMeta(ctx, employeeID)
 	if err != nil {
-		log.Printf("[WARN] GetEmployeeMeta failed: %v", err)
+		log.Error("[WARN] GetEmployeeMeta failed", map[string]any{"error": err})
 	}
 
 	if leaveTypeMeta == nil {

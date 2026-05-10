@@ -564,7 +564,7 @@ func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context,
 			e.id               AS employee_id,
 			e.full_name        AS employee_name,
 			d.name             AS department_name,
-			e.job_position_title AS job_position,
+			j.title AS job_position,
 			COALESCE(al.status::TEXT, 'absent') AS attendance_status,
 			CASE
 				WHEN ml.id IS NOT NULL AND ml.is_submitted = TRUE THEN 'submitted'
@@ -573,6 +573,7 @@ func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context,
 			END AS mutabaah_status
 		FROM employees e
 		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
+		LEFT JOIN job_positions j ON j.id = e.job_positions_id AND j.deleted_at IS NULL
 		INNER JOIN employee_schedules es
 			ON es.employee_id = e.id
 			AND es.is_active = TRUE
@@ -605,11 +606,24 @@ func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context,
 
 func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeRequestDTO, error) {
 	var list []dto.TeamEmployeeRequestDTO
-	args := []interface{}{date, date, date, date, date}
+
+	args := []interface{}{
+		date, date,
+	}
 
 	deptFilter := ""
 	if departmentID != nil {
 		deptFilter = " AND e.department_id = ?"
+		args = append(args, *departmentID)
+	}
+
+	args = append(args, date)
+	if departmentID != nil {
+		args = append(args, *departmentID)
+	}
+
+	args = append(args, date, date)
+	if departmentID != nil {
 		args = append(args, *departmentID)
 	}
 
@@ -619,7 +633,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 				lr.id AS request_id,
 				lr.employee_id,
 				e.full_name AS employee_name,
-				e.job_position_title AS job_position,
+				j.title AS job_position,
 				'leave' AS request_type,
 				TO_CHAR(lr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
 				TO_CHAR(lr.start_date, 'YYYY-MM-DD') AS requested_date,
@@ -627,6 +641,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 				(COALESCE(lt.name, 'Cuti') || ' — ' || lr.total_days || ' hari') AS label
 			FROM leave_requests lr
 			JOIN employees e ON e.id = lr.employee_id AND e.deleted_at IS NULL
+			LEFT JOIN job_positions j ON j.id = e.job_positions_id AND j.deleted_at IS NULL
 			LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id AND lt.deleted_at IS NULL
 			WHERE lr.deleted_at IS NULL
 			  AND lr.start_date <= ?::DATE
@@ -639,7 +654,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 				pr.id AS request_id,
 				pr.employee_id,
 				e.full_name AS employee_name,
-				e.job_position_title AS job_position,
+				j.title AS job_position,
 				'permission' AS request_type,
 				TO_CHAR(pr.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
 				TO_CHAR(pr.date, 'YYYY-MM-DD') AS requested_date,
@@ -647,6 +662,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 				'Izin — ' || COALESCE(pr.reason, '') AS label
 			FROM permission_requests pr
 			JOIN employees e ON e.id = pr.employee_id AND e.deleted_at IS NULL
+			LEFT JOIN job_positions j ON j.id = e.job_positions_id AND j.deleted_at IS NULL
 			WHERE pr.deleted_at IS NULL
 			  AND pr.date = ?::DATE
 			  `+deptFilter+`
@@ -657,7 +673,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 				bt.id AS request_id,
 				bt.employee_id,
 				e.full_name AS employee_name,
-				e.job_position_title AS job_position,
+				j.title AS job_position,
 				'business_trip' AS request_type,
 				TO_CHAR(bt.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
 				TO_CHAR(bt.start_date, 'YYYY-MM-DD') AS requested_date,
@@ -665,6 +681,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 				'Tugas — ' || COALESCE(bt.destination, '') AS label
 			FROM business_trip_requests bt
 			JOIN employees e ON e.id = bt.employee_id AND e.deleted_at IS NULL
+			LEFT JOIN job_positions j ON j.id = e.job_positions_id AND j.deleted_at IS NULL
 			WHERE bt.deleted_at IS NULL
 			  AND bt.start_date <= ?::DATE
 			  AND bt.end_date >= ?::DATE
@@ -672,6 +689,7 @@ func (r *dashboardRepository) GetTeamEmployeeRequestList(ctx context.Context, da
 		) sub
 		ORDER BY created_at DESC
 	`, args...).Scan(&list).Error
+
 	if list == nil {
 		list = []dto.TeamEmployeeRequestDTO{}
 	}
