@@ -99,6 +99,10 @@ func (r *notificationRepository) GetByEmployee(ctx context.Context, tx Transacti
 		return dto.PaginatedResponse[dto.NotificationResponse]{}, err
 	}
 
+	if rows == nil {
+		rows = []dto.NotificationResponse{}
+	}
+
 	perPage := params.GetPerPage()
 	totalPage := 1
 	if perPage > 0 && total > 0 {
