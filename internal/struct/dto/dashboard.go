@@ -75,6 +75,9 @@ type TeamAttendanceSummaryDTO struct {
 	LateToday      int `json:"late_today"`
 	NotClockedIn   int `json:"not_clocked_in"`
 	OnLeave        int `json:"on_leave"`
+	LatePermission int `json:"late_permission"`
+	OnBusinessTrip int `json:"on_business_trip"`
+	Wfa            int `json:"wfa"`
 }
 
 type TeamMutabaahSummaryDTO struct {
@@ -91,14 +94,15 @@ type NotClockedInDTO struct {
 	ShiftStart     *string `json:"shift_start"`
 }
 
-// TeamEmployeeAttendanceDTO — pegawai dengan status kehadiran & mutabaah hari ini
+// TeamEmployeeAttendanceDTO — pegawai dengan status kehadiran & keterangan hari ini
 type TeamEmployeeAttendanceDTO struct {
 	EmployeeID       uint    `json:"employee_id"`
 	EmployeeName     string  `json:"employee_name"`
 	DepartmentName   *string `json:"department_name"`
 	JobPosition      string  `json:"job_position"`
 	AttendanceStatus string  `json:"attendance_status"` // present, late, absent, leave, business_trip, half_day
-	MutabaahStatus   string  `json:"mutabaah_status"`   // submitted, not_submitted, not_applicable
+	Remark           string  `json:"remark"`            // keterangan dari pengajuan tugas, cuti, izin terlambat
+	IsWfa            bool    `json:"is_wfa"`
 }
 
 // TeamEmployeeRequestDTO — pengajuan cuti/izin/tugas pegawai hari ini

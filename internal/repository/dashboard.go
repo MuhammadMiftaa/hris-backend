@@ -226,10 +226,29 @@ func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date
 				 AND std.deleted_at IS NULL
 			 WHERE e.deleted_at IS NULL
 			) AS total_employees,
-			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'present'      AND deleted_at IS NULL) AS present_today,
-			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'late'         AND deleted_at IS NULL) AS late_today,
-			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'leave'        AND deleted_at IS NULL) AS on_leave
-	`, date, date, date, date, date, date).Scan(&summary).Error
+			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'present'       AND deleted_at IS NULL) AS present_today,
+			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'late'          AND deleted_at IS NULL) AS late_today,
+			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'leave'         AND deleted_at IS NULL) AS on_leave,
+			(SELECT COUNT(*) FROM permission_requests
+			 WHERE date = ?::DATE AND permission_type = 'late_arrival' AND status = 'approved' AND deleted_at IS NULL) AS late_permission,
+			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'business_trip' AND deleted_at IS NULL) AS on_business_trip,
+			(SELECT COUNT(DISTINCT e.id)
+			 FROM employees e
+			 INNER JOIN employee_schedules es
+				 ON es.employee_id = e.id
+				 AND es.is_active = TRUE
+				 AND es.effective_date <= ?::DATE
+				 AND (es.end_date IS NULL OR es.end_date >= ?::DATE)
+				 AND es.deleted_at IS NULL
+			 INNER JOIN shift_templates st ON st.id = es.shift_template_id AND st.deleted_at IS NULL
+			 INNER JOIN shift_template_details std
+				 ON std.shift_template_id = st.id
+				 AND std.day_of_week = LOWER(TRIM(TO_CHAR(?::DATE, 'Day')))::day_of_week_enum
+				 AND std.is_working_day = TRUE
+				 AND std.deleted_at IS NULL
+			 WHERE e.deleted_at IS NULL AND st.can_wfa = TRUE
+			) AS wfa
+	`, date, date, date, date, date, date, date, date, date, date, date).Scan(&summary).Error
 	if err != nil {
 		return summary, err
 	}
@@ -551,7 +570,7 @@ func (r *dashboardRepository) GetEmployeeMeta(ctx context.Context, employeeID *u
 
 func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeAttendanceDTO, error) {
 	var list []dto.TeamEmployeeAttendanceDTO
-	args := []interface{}{date, date, date, date, date}
+	args := []interface{}{date, date, date, date, date, date, date, date, date}
 
 	deptFilter := ""
 	if departmentID != nil {
@@ -566,11 +585,33 @@ func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context,
 			d.name             AS department_name,
 			j.title AS job_position,
 			COALESCE(al.status::TEXT, 'absent') AS attendance_status,
-			CASE
-				WHEN ml.id IS NOT NULL AND ml.is_submitted = TRUE THEN 'submitted'
-				WHEN ml.id IS NOT NULL AND ml.is_submitted = FALSE THEN 'not_submitted'
-				ELSE 'not_applicable'
-			END AS mutabaah_status
+			COALESCE(
+				(SELECT COALESCE(lt.name, 'Cuti') || ' — ' || lr.total_days || ' hari'
+				 FROM leave_requests lr
+				 LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id AND lt.deleted_at IS NULL
+				 WHERE lr.employee_id = e.id
+				   AND lr.start_date <= ?::DATE AND lr.end_date >= ?::DATE
+				   AND lr.status IN ('approved_hr')
+				   AND lr.deleted_at IS NULL
+				 LIMIT 1),
+				(SELECT 'Izin terlambat — ' || COALESCE(pr.reason, '')
+				 FROM permission_requests pr
+				 WHERE pr.employee_id = e.id
+				   AND pr.date = ?::DATE
+				   AND pr.permission_type = 'late_arrival'
+				   AND pr.status = 'approved'
+				   AND pr.deleted_at IS NULL
+				 LIMIT 1),
+				(SELECT 'Tugas — ' || COALESCE(bt.destination, '')
+				 FROM business_trip_requests bt
+				 WHERE bt.employee_id = e.id
+				   AND bt.start_date <= ?::DATE AND bt.end_date >= ?::DATE
+				   AND bt.status = 'approved'
+				   AND bt.deleted_at IS NULL
+				 LIMIT 1),
+				''
+			) AS remark,
+			st.can_wfa AS is_wfa
 		FROM employees e
 		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
 		LEFT JOIN job_positions j ON j.id = e.job_positions_id AND j.deleted_at IS NULL
@@ -590,10 +631,6 @@ func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context,
 			ON al.employee_id = e.id
 			AND al.attendance_date = ?::DATE
 			AND al.deleted_at IS NULL
-		LEFT JOIN mutabaah_logs ml
-			ON ml.employee_id = e.id
-			AND ml.log_date = ?::DATE
-			AND ml.deleted_at IS NULL
 		WHERE e.deleted_at IS NULL
 		`+deptFilter+`
 		ORDER BY e.full_name ASC
