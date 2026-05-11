@@ -144,6 +144,11 @@ func main() {
 		"mailto:wafa@example.com",
 	)
 	notifSvc := service.NewNotificationService(pushRepo, notifRepo, pushSvc, empRepo, attendanceRepo)
+	logger.Info("push service initialized", map[string]any{
+		"service":     "push_service",
+		"private_key": env.Cfg.Vapid.PrivateKey,
+		"public_key":  env.Cfg.Vapid.PublicKey,
+	})
 
 	// ── Cron Scheduler ────────────────────────────────────────────
 	mutabaahRepo := repository.NewMutabaahRepository(dbInstance.GetDB())

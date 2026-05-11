@@ -56,7 +56,7 @@ func SetupHTTPServer(dbInstance db.DatabaseClient, redisInstance redis.Redis, mi
 	route.AuthRoutes(app, dbInstance.GetDB(), redisInstance)
 
 	// ── Internal / Cron (juga tanpa auth — amankan via network/firewall) ──
-	route.InternalRoutes(app, dbInstance.GetDB())
+	route.InternalRoutes(app, dbInstance.GetDB(), notifSvc)
 
 	// ── Protected Routes ──────────────────────────────────────────
 	app.Use(middleware.AuthMiddleware(redisInstance))
