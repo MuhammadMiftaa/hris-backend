@@ -9,6 +9,7 @@ import (
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
+	"hris-backend/internal/utils/data"
 )
 
 // NotificationService — service untuk mengelola notifikasi & push
@@ -200,7 +201,7 @@ func (s *notificationService) TriggerRequestApprovalNotification(ctx context.Con
 
 	for _, recipientID := range recipients {
 		if err := s.createNotification(ctx, recipientID, requestType+"_request_new", title, body,
-			s.getActionURL(requestType), s.getActionTab(requestType), &requestType, &entityID, time.Now()); err != nil {
+			data.NotificationActionURL[requestType], data.NotificationActionTab[requestType], &requestType, &entityID, time.Now()); err != nil {
 			logger.Error("failed to create approval notification", map[string]any{
 				"recipient_id": recipientID,
 				"error":        err.Error(),
@@ -220,7 +221,7 @@ func (s *notificationService) TriggerApprovalResultNotification(ctx context.Cont
 	}
 
 	return s.createNotification(ctx, requesterEmployeeID, notifType, title, body,
-		s.getActionURL(requestType), s.getActionTab(requestType), &requestType, &entityID, time.Now())
+		data.NotificationActionURL[requestType], data.NotificationActionTab[requestType], &requestType, &entityID, time.Now())
 }
 
 func (s *notificationService) TriggerAbsentAlert(ctx context.Context, employeeID uint, date string) error {
@@ -287,40 +288,6 @@ func (s *notificationService) createNotification(
 	// Notifikasi tersimpan di DB dengan status 'pending' dan send_at terjadwal.
 	// Cron job akan polling dan mengirim push saat send_at <= NOW().
 	return nil
-}
-
-func (s *notificationService) getActionURL(requestType string) string {
-	switch requestType {
-	case "leave":
-		return "/leave"
-	case "permission":
-		return "/requests"
-	case "overtime":
-		return "/requests"
-	case "business_trip":
-		return "/requests"
-	case "attendance_override":
-		return "/attendance"
-	default:
-		return "/"
-	}
-}
-
-func (s *notificationService) getActionTab(requestType string) string {
-	switch requestType {
-	case "leave":
-		return "leave_requests"
-	case "permission":
-		return "permissions"
-	case "overtime":
-		return "overtime"
-	case "business_trip":
-		return "business_trips"
-	case "attendance_override":
-		return "override_attendance"
-	default:
-		return ""
-	}
 }
 
 // ============================================================================

@@ -32,4 +32,20 @@ var (
 	REQUEST_ID_HEADER = "X-Request-ID"
 	// REQUEST_ID_LOCAL_KEY is the key used to store the request ID in Gin's context locals.
 	REQUEST_ID_LOCAL_KEY = "request_id"
+
+	NotificationActionURL = map[string]string{
+		"leave":               "/leave",
+		"permission":          "/requests",
+		"overtime":            "/requests",
+		"business_trip":       "/requests",
+		"attendance_override": "/attendance",
+	}
+
+	NotificationActionTab = map[string]string{
+		"leave":               "requests",
+		"permission":          "permission",
+		"overtime":            "overtime",
+		"business_trip":       "business_trip",
+		"attendance_override": "override",
+	}
 )

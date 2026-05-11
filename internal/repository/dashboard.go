@@ -104,7 +104,7 @@ func (r *dashboardRepository) GetLeaveBalanceSummary(ctx context.Context, employ
 		SELECT
 			lt.id   AS leave_type_id,
 			lt.name AS leave_type_name,
-			lt.max_occurrences_per_year AS total_quota,
+			lt.max_total_duration_per_year AS total_quota,
 			lb.used_duration            AS used,
 			CASE
 				WHEN lt.max_total_duration_per_year IS NOT NULL
