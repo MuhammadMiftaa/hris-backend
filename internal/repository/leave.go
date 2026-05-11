@@ -48,6 +48,7 @@ type LeaveRepository interface {
 
 	// Metadata
 	GetLeaveTypeMeta(ctx context.Context, tx Transaction) ([]dto.Meta, error)
+	GetParentLeaveTypeMeta(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetEmployeeMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 	GetDepartmentMetaList(ctx context.Context, tx Transaction) ([]dto.Meta, error)
 }
@@ -569,6 +570,16 @@ func (r *leaveRepository) GetLeaveTypeMeta(ctx context.Context, tx Transaction) 
 	}
 	var res []dto.Meta
 	err = db.Raw(`SELECT id::TEXT, name FROM leave_types WHERE deleted_at IS NULL ORDER BY id ASC`).Scan(&res).Error
+	return res, err
+}
+
+func (r *leaveRepository) GetParentLeaveTypeMeta(ctx context.Context, tx Transaction) ([]dto.Meta, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var res []dto.Meta
+	err = db.Raw(`SELECT id::TEXT, name FROM leave_types WHERE deleted_at IS NULL AND parent_leave_type_id IS NULL ORDER BY id ASC`).Scan(&res).Error
 	return res, err
 }
 

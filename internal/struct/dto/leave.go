@@ -151,8 +151,9 @@ type LeaveRequestListParams struct {
 }
 
 type LeaveMetadata struct {
-	LeaveTypeMeta  []Meta `json:"leave_type_meta"`
-	StatusMeta     []Meta `json:"status_meta"`
-	EmployeeMeta   []Meta `json:"employee_meta"`
-	DepartmentMeta []Meta `json:"department_meta"`
+	LeaveTypeMeta       []Meta `json:"leave_type_meta"`
+	ParentLeaveTypeMeta []Meta `json:"parent_leave_type_meta"`
+	StatusMeta          []Meta `json:"status_meta"`
+	EmployeeMeta        []Meta `json:"employee_meta"`
+	DepartmentMeta      []Meta `json:"department_meta"`
 }

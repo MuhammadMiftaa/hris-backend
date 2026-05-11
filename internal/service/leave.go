@@ -65,6 +65,10 @@ func (s *leaveService) GetMetadata(ctx context.Context) (dto.LeaveMetadata, erro
 	if err != nil {
 		return dto.LeaveMetadata{}, err
 	}
+	parentLeaveTypeMeta, err := s.repo.GetParentLeaveTypeMeta(ctx, nil)
+	if err != nil {
+		return dto.LeaveMetadata{}, err
+	}
 	empMeta, err := s.repo.GetEmployeeMetaList(ctx, nil)
 	if err != nil {
 		return dto.LeaveMetadata{}, err
@@ -75,10 +79,11 @@ func (s *leaveService) GetMetadata(ctx context.Context) (dto.LeaveMetadata, erro
 	}
 
 	return dto.LeaveMetadata{
-		LeaveTypeMeta:  leaveTypeMeta,
-		StatusMeta:     data.LeaveRequestStatusMeta,
-		EmployeeMeta:   empMeta,
-		DepartmentMeta: deptMeta,
+		LeaveTypeMeta:       leaveTypeMeta,
+		ParentLeaveTypeMeta: parentLeaveTypeMeta,
+		StatusMeta:          data.LeaveRequestStatusMeta,
+		EmployeeMeta:        empMeta,
+		DepartmentMeta:      deptMeta,
 	}, nil
 }
 
