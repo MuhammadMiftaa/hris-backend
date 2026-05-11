@@ -253,7 +253,7 @@ func (s *notificationService) TriggerAbsentAlert(ctx context.Context, employeeID
 
 func (s *notificationService) TriggerMutabaahReminder(ctx context.Context, employeeID uint, date string) error {
 	title := "Pengingat Mutabaah"
-	body := "Jangan lupa untuk submit mutabaah hari ini ya. Sedikit demi sedikit, lama-lama menjadi bukit."
+	body := "Jangan lupa untuk submit mutabaah hari ini ya."
 	return s.createNotification(ctx, employeeID, "mutabaah_reminder", title, body, "/", "me", nil, nil, time.Now())
 }
 

@@ -130,9 +130,9 @@ func (s *dashboardService) GetTeamDashboard(ctx context.Context, hrID uint) (dto
 
 	teamAttend, _ := s.dashboardRepo.GetTeamAttendanceSummary(ctx, today)
 	teamMutabaah, _ := s.dashboardRepo.GetTeamMutabaahSummary(ctx, today)
-	notClockedIn, _ := s.dashboardRepo.GetNotClockedIn(ctx, today, deptID)
-	notClockedOut, _ := s.dashboardRepo.GetNotClockedOut(ctx, today, deptID)
-	employeeList, _ := s.dashboardRepo.GetTeamEmployeeAttendanceList(ctx, today, deptID)
+	notClockedIn, _ := s.dashboardRepo.GetNotClockedIn(ctx, today, nil)
+	notClockedOut, _ := s.dashboardRepo.GetNotClockedOut(ctx, today, nil)
+	employeeList, _ := s.dashboardRepo.GetTeamEmployeeAttendanceList(ctx, today, nil)
 	requestList, _ := s.dashboardRepo.GetTeamEmployeeRequestList(ctx, today, deptID)
 
 	if notClockedIn == nil {
