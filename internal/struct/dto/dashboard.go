@@ -103,6 +103,7 @@ type TeamEmployeeAttendanceDTO struct {
 	AttendanceStatus string  `json:"attendance_status"` // present, late, absent, leave, business_trip, half_day
 	Remark           string  `json:"remark"`            // keterangan dari pengajuan tugas, cuti, izin terlambat
 	IsWfa            bool    `json:"is_wfa"`
+	IsLatePermission bool    `json:"is_late_permission"` // izin terlambat approved hari ini
 }
 
 // TeamEmployeeRequestDTO — pengajuan cuti/izin/tugas pegawai hari ini

@@ -226,7 +226,16 @@ func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date
 				 AND std.deleted_at IS NULL
 			 WHERE e.deleted_at IS NULL
 			) AS total_employees,
-			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'present'       AND deleted_at IS NULL) AS present_today,
+			(SELECT COUNT(*) FROM attendance_logs al2
+			 WHERE al2.attendance_date = ?::DATE AND al2.status = 'present' AND al2.deleted_at IS NULL
+			   AND NOT EXISTS (
+				 SELECT 1 FROM permission_requests pr3
+				 WHERE pr3.employee_id = al2.employee_id
+				   AND pr3.date = ?::DATE
+				   AND pr3.permission_type = 'late_arrival'
+				   AND pr3.status = 'approved'
+				   AND pr3.deleted_at IS NULL
+			 )) AS present_today,
 			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'late'          AND deleted_at IS NULL) AS late_today,
 			(SELECT COUNT(*) FROM attendance_logs WHERE attendance_date = ?::DATE AND status = 'leave'         AND deleted_at IS NULL) AS on_leave,
 			(SELECT COUNT(*) FROM permission_requests
@@ -248,7 +257,7 @@ func (r *dashboardRepository) GetTeamAttendanceSummary(ctx context.Context, date
 				 AND std.deleted_at IS NULL
 			 WHERE e.deleted_at IS NULL AND st.can_wfa = TRUE
 			) AS wfa
-	`, date, date, date, date, date, date, date, date, date, date, date).Scan(&summary).Error
+	`, date, date, date, date, date, date, date, date, date, date, date, date).Scan(&summary).Error
 	if err != nil {
 		return summary, err
 	}
@@ -345,7 +354,6 @@ func (r *dashboardRepository) GetNotClockedIn(ctx context.Context, date string, 
 		  )
 		`+deptFilter+`
 		ORDER BY std.clock_in_start ASC
-		LIMIT 10
 	`, args...).Scan(&list).Error
 	return list, err
 }
@@ -570,7 +578,7 @@ func (r *dashboardRepository) GetEmployeeMeta(ctx context.Context, employeeID *u
 
 func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context, date string, departmentID *uint) ([]dto.TeamEmployeeAttendanceDTO, error) {
 	var list []dto.TeamEmployeeAttendanceDTO
-	args := []interface{}{date, date, date, date, date, date, date, date, date}
+	args := []interface{}{date, date, date, date, date, date, date, date, date, date}
 
 	deptFilter := ""
 	if departmentID != nil {
@@ -611,7 +619,15 @@ func (r *dashboardRepository) GetTeamEmployeeAttendanceList(ctx context.Context,
 				 LIMIT 1),
 				''
 			) AS remark,
-			st.can_wfa AS is_wfa
+			st.can_wfa AS is_wfa,
+			EXISTS (
+				SELECT 1 FROM permission_requests pr2
+				WHERE pr2.employee_id = e.id
+				  AND pr2.date = ?::DATE
+				  AND pr2.permission_type = 'late_arrival'
+				  AND pr2.status = 'approved'
+				  AND pr2.deleted_at IS NULL
+			) AS is_late_permission
 		FROM employees e
 		LEFT JOIN departments d ON d.id = e.department_id AND d.deleted_at IS NULL
 		LEFT JOIN job_positions j ON j.id = e.job_positions_id AND j.deleted_at IS NULL
