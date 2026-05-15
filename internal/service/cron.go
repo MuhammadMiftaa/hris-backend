@@ -82,16 +82,50 @@ func (s *cronService) RunDailyAbsentMark(ctx context.Context, date string) error
 
 	for _, empID := range employeeIDs {
 		// Cek hari libur per cabang pegawai
-		branchID, _ := s.attendRepo.GetEmployeeBranchID(ctx, nil, empID)
-		isHoliday, _, _ := s.attendRepo.IsHoliday(ctx, nil, branchID, date)
+		branchID, err := s.attendRepo.GetEmployeeBranchID(ctx, nil, empID)
+		if err != nil {
+			logger.Error("cron: failed to get employee branch ID", map[string]any{
+				"employee_id": empID,
+				"error":       err.Error(),
+			})
+			skipped++
+			continue
+		}
+
+		isHoliday, _, err := s.attendRepo.IsHoliday(ctx, nil, branchID, date)
+		if err != nil {
+			logger.Error("cron: failed to check holiday", map[string]any{
+				"employee_id": empID,
+				"error":       err.Error(),
+			})
+			skipped++
+			continue
+		}
 		if isHoliday {
 			skipped++
 			continue
 		}
 
 		// Cek cuti yang disetujui — kalau ada cuti, buat log dengan status leave
-		leaveID, _ := s.attendRepo.GetApprovedLeave(ctx, nil, empID, date)
-		tripID, _ := s.attendRepo.GetApprovedBusinessTrip(ctx, nil, empID, date)
+		leaveID, err := s.attendRepo.GetApprovedLeave(ctx, nil, empID, date)
+		if err != nil {
+			logger.Error("cron: failed to get approved leave", map[string]any{
+				"employee_id": empID,
+				"error":       err.Error(),
+			})
+			skipped++
+			continue
+		}
+
+		tripID, err := s.attendRepo.GetApprovedBusinessTrip(ctx, nil, empID, date)
+		if err != nil {
+			logger.Error("cron: failed to get approved business trip", map[string]any{
+				"employee_id": empID,
+				"error":       err.Error(),
+			})
+			skipped++
+			continue
+		}
 
 		var status model.AttendanceStatusEnum
 		var leaveRequestID *uint
@@ -109,7 +143,15 @@ func (s *cronService) RunDailyAbsentMark(ctx context.Context, date string) error
 		}
 
 		// Ambil schedule ID
-		shift, _ := s.attendRepo.GetActiveSchedule(ctx, nil, empID, date)
+		shift, err := s.attendRepo.GetActiveSchedule(ctx, nil, empID, date)
+		if err != nil {
+			logger.Error("cron: failed to get active schedule", map[string]any{
+				"employee_id": empID,
+				"error":       err.Error(),
+			})
+			skipped++
+			continue
+		}
 		var scheduleID *uint
 		if shift != nil {
 			scheduleID = &shift.ScheduleID
@@ -287,7 +329,15 @@ func (s *cronService) RunDailyReportMark(ctx context.Context, date string) error
 
 // GenerateDailyPushReminders — generate clock in/out reminders untuk besok
 func (s *cronService) GenerateDailyPushReminders(ctx context.Context, date string) error {
-	tomorrow := utils.TodayDate()
+	if date == "" {
+		date = utils.TodayDate()
+	}
+
+	parsedDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return fmt.Errorf("cron: parse date: %w", err)
+	}
+	tomorrow := parsedDate.AddDate(0, 0, 1).Format("2006-01-02")
 	logger.Info("cron: generate daily push reminders", map[string]any{"date": tomorrow})
 
 	// Get all employees with active schedule tomorrow
@@ -297,6 +347,29 @@ func (s *cronService) GenerateDailyPushReminders(ctx context.Context, date strin
 	}
 
 	for _, empID := range employeeIDs {
+		// Cek hari libur per cabang pegawai
+		branchID, err := s.attendRepo.GetEmployeeBranchID(ctx, nil, empID)
+		if err != nil {
+			continue
+		}
+
+		isHoliday, _, err := s.attendRepo.IsHoliday(ctx, nil, branchID, tomorrow)
+		if err == nil && isHoliday {
+			continue
+		}
+
+		// Cek cuti
+		leaveID, err := s.attendRepo.GetApprovedLeave(ctx, nil, empID, tomorrow)
+		if err == nil && leaveID != nil {
+			continue
+		}
+
+		// Cek dinas luar
+		tripID, err := s.attendRepo.GetApprovedBusinessTrip(ctx, nil, empID, tomorrow)
+		if err == nil && tripID != nil {
+			continue
+		}
+
 		shift, err := s.attendRepo.GetActiveSchedule(ctx, nil, empID, tomorrow)
 		if err != nil || shift == nil || !shift.IsWorkingDay {
 			continue
@@ -324,16 +397,40 @@ func (s *cronService) GenerateDailyPushReminders(ctx context.Context, date strin
 
 		// Prayer Reminders
 		if shift.BreakDhuhrStart != nil {
-			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakDhuhrStart, true, "Zuhur")
+			err = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakDhuhrStart, true, "Zuhur")
+			if err != nil {
+				logger.Error("cron: failed to trigger prayer reminder", map[string]any{
+					"employee_id": empID,
+					"error":       err.Error(),
+				})
+			}
 		}
 		if shift.BreakDhuhrEnd != nil {
-			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakDhuhrEnd, false, "Zuhur")
+			err = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakDhuhrEnd, false, "Zuhur")
+			if err != nil {
+				logger.Error("cron: failed to trigger prayer reminder", map[string]any{
+					"employee_id": empID,
+					"error":       err.Error(),
+				})
+			}
 		}
 		if shift.BreakAsrStart != nil {
-			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakAsrStart, true, "Asar")
+			err = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakAsrStart, true, "Asar")
+			if err != nil {
+				logger.Error("cron: failed to trigger prayer reminder", map[string]any{
+					"employee_id": empID,
+					"error":       err.Error(),
+				})
+			}
 		}
 		if shift.BreakAsrEnd != nil {
-			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakAsrEnd, false, "Asar")
+			err = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakAsrEnd, false, "Asar")
+			if err != nil {
+				logger.Error("cron: failed to trigger prayer reminder", map[string]any{
+					"employee_id": empID,
+					"error":       err.Error(),
+				})
+			}
 		}
 	}
 

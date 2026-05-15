@@ -442,7 +442,7 @@ func (s *notificationService) incrementAttemptAndMaybeFail(ctx context.Context, 
 func (s *notificationService) shouldSkipClockReminder(ctx context.Context, notif *model.Notification) bool {
 	// Clock in reminder: skip if already clocked in
 	if notif.Type == "clock_in_reminder" {
-		log, _ := s.attendRepo.GetTodayLog(ctx, nil, notif.EmployeeID, notif.CreatedAt.Format("2006-01-02"))
+		log, _ := s.attendRepo.GetTodayLog(ctx, nil, notif.EmployeeID, notif.SendAt.Format("2006-01-02"))
 		if log != nil && (log.Status == string(model.AttendancePresent) || log.Status == string(model.AttendanceLate) || log.Status == string(model.AttendanceHalfDay)) {
 			return true
 		}
@@ -450,7 +450,7 @@ func (s *notificationService) shouldSkipClockReminder(ctx context.Context, notif
 	}
 	// Clock out reminder: skip if not clocked in or already clocked out
 	if notif.Type == "clock_out_reminder" {
-		log, _ := s.attendRepo.GetTodayLog(ctx, nil, notif.EmployeeID, notif.CreatedAt.Format("2006-01-02"))
+		log, _ := s.attendRepo.GetTodayLog(ctx, nil, notif.EmployeeID, notif.SendAt.Format("2006-01-02"))
 		if log == nil {
 			return true // not clocked in yet
 		}
