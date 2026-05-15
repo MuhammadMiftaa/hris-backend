@@ -41,11 +41,11 @@ type NotificationService interface {
 }
 
 type notificationService struct {
-	pushRepo         repository.PushRepository
-	notifRepo        repository.NotificationRepository
-	pushSvc          PushService
-	employeeRepo     repository.EmployeeRepository
-	attendRepo       repository.AttendanceRepository
+	pushRepo     repository.PushRepository
+	notifRepo    repository.NotificationRepository
+	pushSvc      PushService
+	employeeRepo repository.EmployeeRepository
+	attendRepo   repository.AttendanceRepository
 }
 
 func NewNotificationService(
@@ -56,11 +56,11 @@ func NewNotificationService(
 	attendRepo repository.AttendanceRepository,
 ) NotificationService {
 	return &notificationService{
-		pushRepo:      pushRepo,
-		notifRepo:     notifRepo,
-		pushSvc:       pushSvc,
-		employeeRepo:  employeeRepo,
-		attendRepo:    attendRepo,
+		pushRepo:     pushRepo,
+		notifRepo:    notifRepo,
+		pushSvc:      pushSvc,
+		employeeRepo: employeeRepo,
+		attendRepo:   attendRepo,
 	}
 }
 
@@ -180,14 +180,20 @@ func (s *notificationService) TriggerClockOutReminder(ctx context.Context, emplo
 
 func (s *notificationService) TriggerPrayerReminder(ctx context.Context, employeeID uint, date, prayerTime string, isStart bool, prayerName string) error {
 	var title, body string
-	if isStart {
+	if isStart && prayerName == "Zuhur" {
 		title = fmt.Sprintf("Waktu %s", prayerName)
-		body = fmt.Sprintf("Waktu istirahat %s telah tiba (%s). Jangan lupa untuk menunaikan ibadah salat ya.", prayerName, prayerTime)
-	} else {
+		body = fmt.Sprintf("Waktu istirahat Dzuhur telah tiba (%s). Jangan lupa untuk menunaikan sholat Dzuhur ya.", prayerName, prayerTime)
+	} else if !isStart && prayerName == "Zuhur" {
 		title = fmt.Sprintf("Akhir Waktu %s", prayerName)
-		body = fmt.Sprintf("Waktu istirahat %s akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerName, prayerTime)
+		body = fmt.Sprintf("Waktu istirahat Dzuhur akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerName, prayerTime)
+	} else if isStart && prayerName == "Asar" {
+		title = fmt.Sprintf("Waktu %s", prayerName)
+		body = fmt.Sprintf("Waktu sholat Ashar telah tiba (%s). Jangan lupa untuk menunaikan sholat Ashar ya.", prayerName, prayerTime)
+	} else if !isStart && prayerName == "Asar" {
+		title = fmt.Sprintf("Akhir Waktu %s", prayerName)
+		body = fmt.Sprintf("Waktu sholat Ashar akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerName, prayerTime)
 	}
-	
+
 	var sendAt time.Time
 	if !isStart {
 		sendAt = s.calculateReminderSendAt(date, prayerTime)
@@ -203,7 +209,7 @@ func (s *notificationService) TriggerPrayerReminder(ctx context.Context, employe
 		}
 		sendAt = t
 	}
-	
+
 	return s.createNotification(ctx, employeeID, "prayer_reminder", title, body, "/", "me", nil, nil, sendAt)
 }
 

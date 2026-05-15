@@ -624,7 +624,7 @@ func (r *leaveRepository) GetEmployeeBalanceSummary(ctx context.Context, tx Tran
 		  FROM leave_balance_adjustments
 		  GROUP BY leave_balance_id
 		) adj ON adj.leave_balance_id = b.id
-		WHERE b.deleted_at IS NULL AND b.effective_date <= NOW()
+		WHERE b.deleted_at IS NULL
 	`
 	args := []interface{}{}
 
@@ -664,9 +664,9 @@ func (r *leaveRepository) GetEmployeeBalanceSummary(ctx context.Context, tx Tran
 		  d.name AS department_name,
 		  jp.title AS job_position_title,
 		  b.year,
-		  SUM(b.allocated_duration + COALESCE(adj.total_delta, 0)) AS total_allocated,
+		  SUM(CASE WHEN b.effective_date <= NOW() THEN b.allocated_duration + COALESCE(adj.total_delta, 0) ELSE 0 END) AS total_allocated,
 		  SUM(b.used_duration) AS total_used,
-		  SUM(b.allocated_duration + COALESCE(adj.total_delta, 0) - b.used_duration) AS total_remaining
+		  SUM((CASE WHEN b.effective_date <= NOW() THEN b.allocated_duration + COALESCE(adj.total_delta, 0) ELSE 0 END) - b.used_duration) AS total_remaining
 	` + baseQuery + `
 		GROUP BY e.id, e.full_name, d.name, jp.title, b.year
 	`
