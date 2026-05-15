@@ -324,6 +324,10 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 		IsWorkingDay    bool    `db:"is_working_day"`
 		ClockInStart    *string `db:"clock_in_start"`
 		ClockInEnd      *string `db:"clock_in_end"`
+		BreakDhuhrStart *string `db:"break_dhuhr_start"`
+		BreakDhuhrEnd   *string `db:"break_dhuhr_end"`
+		BreakAsrStart   *string `db:"break_asr_start"`
+		BreakAsrEnd     *string `db:"break_asr_end"`
 		ClockOutStart   *string `db:"clock_out_start"`
 		ClockOutEnd     *string `db:"clock_out_end"`
 	}
@@ -339,6 +343,10 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 			COALESCE(std.is_working_day, TRUE) AS is_working_day,
 			std.clock_in_start::TEXT           AS clock_in_start,
 			std.clock_in_end::TEXT             AS clock_in_end,
+			std.break_dhuhr_start::TEXT        AS break_dhuhr_start,
+			std.break_dhuhr_end::TEXT          AS break_dhuhr_end,
+			std.break_asr_start::TEXT          AS break_asr_start,
+			std.break_asr_end::TEXT            AS break_asr_end,
 			std.clock_out_start::TEXT          AS clock_out_start,
 			std.clock_out_end::TEXT            AS clock_out_end
 		FROM employee_schedules es
@@ -372,6 +380,10 @@ func (r *attendanceRepository) GetActiveSchedule(ctx context.Context, tx Transac
 		IsWorkingDay:    ctx2.IsWorkingDay,
 		ClockInStart:    ctx2.ClockInStart,
 		ClockInEnd:      ctx2.ClockInEnd,
+		BreakDhuhrStart: ctx2.BreakDhuhrStart,
+		BreakDhuhrEnd:   ctx2.BreakDhuhrEnd,
+		BreakAsrStart:   ctx2.BreakAsrStart,
+		BreakAsrEnd:     ctx2.BreakAsrEnd,
 		ClockOutStart:   ctx2.ClockOutStart,
 		ClockOutEnd:     ctx2.ClockOutEnd,
 	}, nil

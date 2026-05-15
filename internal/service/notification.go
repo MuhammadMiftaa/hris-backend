@@ -27,6 +27,7 @@ type NotificationService interface {
 	// Business Triggers
 	TriggerClockInReminder(ctx context.Context, employeeID uint, date, clockInEnd string) error
 	TriggerClockOutReminder(ctx context.Context, employeeID uint, date, clockOutEnd string) error
+	TriggerPrayerReminder(ctx context.Context, employeeID uint, date, prayerTime string, isStart bool, prayerName string) error
 	TriggerRequestApprovalNotification(ctx context.Context, requestType string, entityID uint, requesterEmployeeID uint) error
 	TriggerApprovalResultNotification(ctx context.Context, requestType string, entityID uint, requesterEmployeeID uint, status string) error
 	TriggerAbsentAlert(ctx context.Context, employeeID uint, date string) error
@@ -156,17 +157,54 @@ func (s *notificationService) formatStatus(status string) string {
 // ============================================================================
 
 func (s *notificationService) TriggerClockInReminder(ctx context.Context, employeeID uint, date, clockInEnd string) error {
+	hasPerm, err := s.notifRepo.CheckEmployeePermission(ctx, nil, employeeID, data.PERM_HomeClockIn)
+	if err != nil || !hasPerm {
+		return nil
+	}
 	title := "Pengingat Clock In"
 	body := fmt.Sprintf("Selamat datang kembali! Jangan lupa untuk clock in sebelum jam %s ya.", clockInEnd)
 	sendAt := s.calculateReminderSendAt(date, clockInEnd)
-	return s.createNotification(ctx, employeeID, "clock_in_reminder", title, body, "/", "me", nil, nil, sendAt)
+	return s.createNotification(ctx, employeeID, "clock_in_reminder", title, body, "/attendance", "attendance", nil, nil, sendAt)
 }
 
 func (s *notificationService) TriggerClockOutReminder(ctx context.Context, employeeID uint, date, clockOutEnd string) error {
+	hasPerm, err := s.notifRepo.CheckEmployeePermission(ctx, nil, employeeID, data.PERM_HomeClockOut)
+	if err != nil || !hasPerm {
+		return nil
+	}
 	title := "Pengingat Clock Out"
 	body := fmt.Sprintf("Hari ini sudah produktif! Jangan lupa untuk clock out sebelum jam %s ya.", clockOutEnd)
 	sendAt := s.calculateReminderSendAt(date, clockOutEnd)
-	return s.createNotification(ctx, employeeID, "clock_out_reminder", title, body, "/", "me", nil, nil, sendAt)
+	return s.createNotification(ctx, employeeID, "clock_out_reminder", title, body, "/attendance", "attendance", nil, nil, sendAt)
+}
+
+func (s *notificationService) TriggerPrayerReminder(ctx context.Context, employeeID uint, date, prayerTime string, isStart bool, prayerName string) error {
+	var title, body string
+	if isStart {
+		title = fmt.Sprintf("Waktu %s", prayerName)
+		body = fmt.Sprintf("Waktu istirahat %s telah tiba (%s). Jangan lupa untuk menunaikan ibadah salat ya.", prayerName, prayerTime)
+	} else {
+		title = fmt.Sprintf("Akhir Waktu %s", prayerName)
+		body = fmt.Sprintf("Waktu istirahat %s akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerName, prayerTime)
+	}
+	
+	var sendAt time.Time
+	if !isStart {
+		sendAt = s.calculateReminderSendAt(date, prayerTime)
+	} else {
+		layout := "2006-01-02 15:04:05"
+		datetimeStr := date + " " + prayerTime
+		if len(prayerTime) == 5 {
+			datetimeStr = date + " " + prayerTime + ":00"
+		}
+		t, err := time.ParseInLocation(layout, datetimeStr, time.Local)
+		if err != nil {
+			t = time.Now()
+		}
+		sendAt = t
+	}
+	
+	return s.createNotification(ctx, employeeID, "prayer_reminder", title, body, "/", "me", nil, nil, sendAt)
 }
 
 // calculateReminderSendAt menghitung waktu kirim pengingat (10 menit sebelum batas waktu)
@@ -253,7 +291,7 @@ func (s *notificationService) TriggerAbsentAlert(ctx context.Context, employeeID
 
 func (s *notificationService) TriggerMutabaahReminder(ctx context.Context, employeeID uint, date string) error {
 	title := "Pengingat Mutabaah"
-	body := "Jangan lupa untuk submit mutabaah hari ini ya."
+	body := "Jangan lupa untuk sempatkan mutabaah hari ini ya."
 	return s.createNotification(ctx, employeeID, "mutabaah_reminder", title, body, "/", "me", nil, nil, time.Now())
 }
 
@@ -407,6 +445,20 @@ func (s *notificationService) shouldSkipClockReminder(ctx context.Context, notif
 	// Clock out reminder: skip if not clocked in or already clocked out
 	if notif.Type == "clock_out_reminder" {
 		log, _ := s.attendRepo.GetTodayLog(ctx, nil, notif.EmployeeID, notif.CreatedAt.Format("2006-01-02"))
+		if log == nil {
+			return true // not clocked in yet
+		}
+		if log.ClockOutAt != nil {
+			return true // already clocked out
+		}
+		if log.Status == string(model.AttendanceAbsent) || log.Status == string(model.AttendanceLeave) {
+			return true
+		}
+		return false
+	}
+	// Prayer reminder: skip if not clocked in or already clocked out
+	if notif.Type == "prayer_reminder" {
+		log, _ := s.attendRepo.GetTodayLog(ctx, nil, notif.EmployeeID, notif.SendAt.Format("2006-01-02"))
 		if log == nil {
 			return true // not clocked in yet
 		}

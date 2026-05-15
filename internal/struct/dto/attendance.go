@@ -83,6 +83,10 @@ type ShiftDayContext struct {
 	CanWFA          bool    `json:"can_wfa"`
 	ClockInStart    *string `json:"clock_in_start"`
 	ClockInEnd      *string `json:"clock_in_end"`
+	BreakDhuhrStart *string `json:"break_dhuhr_start"`
+	BreakDhuhrEnd   *string `json:"break_dhuhr_end"`
+	BreakAsrStart   *string `json:"break_asr_start"`
+	BreakAsrEnd     *string `json:"break_asr_end"`
 	ClockOutStart   *string `json:"clock_out_start"`
 	ClockOutEnd     *string `json:"clock_out_end"`
 }

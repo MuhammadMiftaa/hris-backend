@@ -22,6 +22,7 @@ type NotificationRepository interface {
 	IncrementPushAttempts(ctx context.Context, tx Transaction, id uint) error
 	GetRecipientsForApproval(ctx context.Context, tx Transaction, requesterEmployeeID uint) ([]uint, error)
 	GetEmployeesForMutabaahReminder(ctx context.Context, tx Transaction, date string) ([]uint, error)
+	CheckEmployeePermission(ctx context.Context, tx Transaction, employeeID uint, permCode string) (bool, error)
 	// DB-based polling for push sender (no Redis)
 	GetPendingNotifications(ctx context.Context, tx Transaction, limit int) ([]model.Notification, error)
 }
@@ -231,6 +232,7 @@ func (r *notificationRepository) GetEmployeesForMutabaahReminder(ctx context.Con
 
 	var ids []uint
 	// Pegawai yang hadir (present/late) tapi belum submit mutabaah di tanggal tersebut
+	// Hanya pegawai dengan permission PERM_MutabaahCreate
 	err = db.Raw(`
 		SELECT DISTINCT al.employee_id
 		FROM attendance_logs al
@@ -238,12 +240,30 @@ func (r *notificationRepository) GetEmployeesForMutabaahReminder(ctx context.Con
 			ON ml.employee_id = al.employee_id
 			AND ml.log_date = al.attendance_date
 			AND ml.deleted_at IS NULL
+		JOIN accounts a ON a.employee_id = al.employee_id AND a.deleted_at IS NULL AND a.is_active = TRUE
+		JOIN role_permissions rp ON rp.role_id = a.role_id AND rp.permission_code = 'mutabaah-create'
 		WHERE al.attendance_date = ?::DATE
 		  AND al.status IN ('present', 'late')
 		  AND al.deleted_at IS NULL
 		  AND (ml.id IS NULL OR ml.is_submitted = FALSE)
 	`, date).Scan(&ids).Error
 	return ids, err
+}
+
+func (r *notificationRepository) CheckEmployeePermission(ctx context.Context, tx Transaction, employeeID uint, permCode string) (bool, error) {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return false, err
+	}
+	var count int64
+	err = db.Raw(`
+		SELECT COUNT(*)
+		FROM accounts a
+		JOIN role_permissions rp ON rp.role_id = a.role_id
+		WHERE a.employee_id = ? AND a.deleted_at IS NULL AND a.is_active = TRUE
+		  AND rp.permission_code = ?
+	`, employeeID, permCode).Scan(&count).Error
+	return count > 0, err
 }
 
 // GetPendingNotifications — ambil notifikasi yang perlu dikirim via push.

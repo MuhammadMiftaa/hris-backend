@@ -321,6 +321,20 @@ func (s *cronService) GenerateDailyPushReminders(ctx context.Context, date strin
 				})
 			}
 		}
+
+		// Prayer Reminders
+		if shift.BreakDhuhrStart != nil {
+			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakDhuhrStart, true, "Zuhur")
+		}
+		if shift.BreakDhuhrEnd != nil {
+			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakDhuhrEnd, false, "Zuhur")
+		}
+		if shift.BreakAsrStart != nil {
+			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakAsrStart, true, "Asar")
+		}
+		if shift.BreakAsrEnd != nil {
+			_ = s.notifSvc.TriggerPrayerReminder(ctx, empID, tomorrow, *shift.BreakAsrEnd, false, "Asar")
+		}
 	}
 
 	logger.Info("cron: daily push reminders generated", map[string]any{
