@@ -16,9 +16,10 @@ func InternalRoutes(app *fiber.App, db *gorm.DB, notifSvc service.NotificationSe
 	attendRepo := repository.NewAttendanceRepository(db)
 	mutaRepo := repository.NewMutabaahRepository(db)
 	dailyRepo := repository.NewDailyReportRepository(db)
+	shiftRepo := repository.NewShiftRepository(db)
 	txManager := repository.NewTxManager(db)
 
-	cronSvc := service.NewCronService(attendRepo, mutaRepo, dailyRepo, txManager, notifSvc)
+	cronSvc := service.NewCronService(attendRepo, mutaRepo, dailyRepo, shiftRepo, txManager, notifSvc)
 	cronH := handler.NewCronHandler(cronSvc)
 
 	internal := app.Group("/internal")

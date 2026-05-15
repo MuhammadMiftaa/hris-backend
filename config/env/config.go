@@ -48,8 +48,9 @@ type (
 	}
 
 	ExternalAPI struct {
-		IndonesiaHolidayAPIKey string `env:"INDONESIA_HOLIDAY_API_KEY"`
-		IndonesiaHolidayAPIURL string `env:"INDONESIA_HOLIDAY_API_URL"`
+		APICOIDKey  string `env:"API_CO_ID_KEY"`
+		APICOIDURL  string `env:"API_CO_ID_URL"`
+		RegencyCode string `env:"API_CO_ID_REGENCY_CODE"`
 	}
 
 	Config struct {
@@ -119,8 +120,9 @@ func LoadNative() ([]string, error) {
 		Cfg.Vapid.PublicKey = val
 	}
 
-	lookupEnv("INDONESIA_HOLIDAY_API_KEY", &Cfg.ExternalAPI.IndonesiaHolidayAPIKey, &missing)
-	lookupEnv("INDONESIA_HOLIDAY_API_URL", &Cfg.ExternalAPI.IndonesiaHolidayAPIURL, &missing)
+	lookupEnv("API_CO_ID_KEY", &Cfg.ExternalAPI.APICOIDKey, &missing)
+	lookupEnv("API_CO_ID_URL", &Cfg.ExternalAPI.APICOIDURL, &missing)
+	lookupEnv("API_CO_ID_REGENCY_CODE", &Cfg.ExternalAPI.RegencyCode, &missing)
 
 	return missing, nil
 }

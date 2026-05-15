@@ -28,6 +28,7 @@ type ShiftRepository interface {
 	GetDetailsByTemplateID(ctx context.Context, tx Transaction, shiftID uint) ([]dto.ShiftTemplateDetailResp, error)
 	DeleteDetailsByTemplateID(ctx context.Context, tx Transaction, shiftID uint) error
 	CreateDetails(ctx context.Context, tx Transaction, details []model.ShiftTemplateDetail) error
+	UpdatePrayerTimesByDayOfWeek(ctx context.Context, tx Transaction, dayOfWeek string, breakDhuhrStart, breakDhuhrEnd, breakAsrStart, breakAsrEnd string) error
 
 	// Schedule
 	GetAllSchedules(ctx context.Context, tx Transaction, params dto.ScheduleListParams) (dto.PaginatedResponse[dto.ScheduleResponse], error)
@@ -305,6 +306,25 @@ func (r *shiftRepository) CreateDetails(ctx context.Context, tx Transaction, det
 		return nil
 	}
 	if err := db.Create(&details).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *shiftRepository) UpdatePrayerTimesByDayOfWeek(ctx context.Context, tx Transaction, dayOfWeek string, breakDhuhrStart, breakDhuhrEnd, breakAsrStart, breakAsrEnd string) error {
+	db, err := r.getDB(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	if err := db.Exec(`
+		UPDATE shift_template_details
+		SET break_dhuhr_start = ?,
+		    break_dhuhr_end = ?,
+		    break_asr_start = ?,
+		    break_asr_end = ?
+		WHERE day_of_week = ?
+	`, breakDhuhrStart, breakDhuhrEnd, breakAsrStart, breakAsrEnd, dayOfWeek).Error; err != nil {
 		return err
 	}
 	return nil

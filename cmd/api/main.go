@@ -153,8 +153,9 @@ func main() {
 	// ── Cron Scheduler ────────────────────────────────────────────
 	mutabaahRepo := repository.NewMutabaahRepository(dbInstance.GetDB())
 	dailyReportRepo := repository.NewDailyReportRepository(dbInstance.GetDB())
+	shiftRepo := repository.NewShiftRepository(dbInstance.GetDB())
 	txManager := repository.NewTxManager(dbInstance.GetDB())
-	cronSvc := service.NewCronService(attendanceRepo, mutabaahRepo, dailyReportRepo, txManager, notifSvc)
+	cronSvc := service.NewCronService(attendanceRepo, mutabaahRepo, dailyReportRepo, shiftRepo, txManager, notifSvc)
 	scheduler := cron.NewScheduler(cronSvc)
 	scheduler.Start()
 

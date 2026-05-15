@@ -21,12 +21,14 @@ type CronService interface {
 	GenerateDailyPushReminders(ctx context.Context, date string) error
 	SendMutabaahReminders(ctx context.Context, date string) error
 	SendPendingNotifications(ctx context.Context) error
+	RunWeeklyPrayerTimeSync(ctx context.Context) error
 }
 
 type cronService struct {
 	attendRepo    repository.AttendanceRepository
 	mutabaah      repository.MutabaahRepository
 	dailyReport   repository.DailyReportRepository
+	shiftRepo     repository.ShiftRepository
 	txManager     repository.TxManager
 	notifSvc      NotificationService
 }
@@ -35,6 +37,7 @@ func NewCronService(
 	attendRepo repository.AttendanceRepository,
 	mutabaah repository.MutabaahRepository,
 	dailyReport repository.DailyReportRepository,
+	shiftRepo repository.ShiftRepository,
 	txManager repository.TxManager,
 	notifSvc NotificationService,
 ) CronService {
@@ -42,6 +45,7 @@ func NewCronService(
 		attendRepo:  attendRepo,
 		mutabaah:    mutabaah,
 		dailyReport: dailyReport,
+		shiftRepo:   shiftRepo,
 		txManager:   txManager,
 		notifSvc:    notifSvc,
 	}
@@ -341,4 +345,13 @@ func (s *cronService) SendMutabaahReminders(ctx context.Context, date string) er
 // SendPendingNotifications — polling DB setiap menit untuk kirim push pending
 func (s *cronService) SendPendingNotifications(ctx context.Context) error {
 	return s.notifSvc.SendPendingNotifications(ctx)
+}
+
+// RunWeeklyPrayerTimeSync — fetch prayer times from external API and update shift templates
+func (s *cronService) RunWeeklyPrayerTimeSync(ctx context.Context) error {
+	logger.Info("cron: start weekly prayer time sync")
+	if err := s.shiftRepo.(ShiftService).SyncPrayerTimesForCurrentWeek(ctx); err != nil {
+		return fmt.Errorf("cron: weekly sync failed: %w", err)
+	}
+	return nil
 }

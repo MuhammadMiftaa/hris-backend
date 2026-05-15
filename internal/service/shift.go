@@ -2,8 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"time"
+
+	"hris-backend/config/env"
+	logger "hris-backend/config/log"
 
 	"hris-backend/internal/repository"
 	"hris-backend/internal/struct/dto"
@@ -30,6 +37,8 @@ type ShiftService interface {
 	DeleteSchedule(ctx context.Context, id uint) error
 	// Today schedule check
 	CheckTodaySchedule(ctx context.Context, employeeID uint) (dto.TodayScheduleResponse, error)
+	// Prayer Time Sync
+	SyncPrayerTimesForCurrentWeek(ctx context.Context) error
 }
 
 type shiftService struct {
@@ -366,6 +375,114 @@ func (s *shiftService) CheckTodaySchedule(ctx context.Context, employeeID uint) 
 		ClockOutStart: shift.ClockOutStart,
 		ClockOutEnd:   shift.ClockOutEnd,
 	}, nil
+}
+
+// ── Prayer Time Sync ─────────────────────────────────
+
+func (s *shiftService) SyncPrayerTimesForCurrentWeek(ctx context.Context) error {
+	now := time.Now()
+	// Get Monday of current week
+	offset := (int(now.Weekday()) + 6) % 7
+	monday := now.AddDate(0, 0, -offset)
+	sunday := monday.AddDate(0, 0, 6)
+
+	startDate := monday.Format("2006-01-02")
+	endDate := sunday.Format("2006-01-02")
+
+	regencyCode := env.Cfg.ExternalAPI.RegencyCode
+	if regencyCode == "" {
+		regencyCode = "3578" // Default to Surabaya if not set
+	}
+
+	apiURL := fmt.Sprintf("%s/regional/indonesia/prayer-times?regency_code=%s&start_date=%s&end_date=%s",
+		env.Cfg.ExternalAPI.APICOIDURL, regencyCode, startDate, endDate)
+
+	logger.Info("shift: start manual prayer time sync", map[string]any{
+		"start_date": startDate,
+		"end_date":   endDate,
+		"url":        apiURL,
+	})
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return fmt.Errorf("shift: build prayer time request: %w", err)
+	}
+
+	httpReq.Header.Set("x-api-co-id", env.Cfg.ExternalAPI.APICOIDKey)
+	httpReq.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("shift: call prayer time api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("shift: prayer time api returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("shift: read prayer time response: %w", err)
+	}
+
+	var apiResp dto.ExternalPrayerTimeAPIResponse
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return fmt.Errorf("shift: parse prayer time JSON: %w", err)
+	}
+
+	if !apiResp.IsSuccess {
+		return fmt.Errorf("shift: external prayer time api error: %s", apiResp.Message)
+	}
+
+	tx, err := s.txManager.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("shift: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, item := range apiResp.Data {
+		parsedDate, err := time.Parse("2006-01-02", item.Date)
+		if err != nil {
+			logger.Warn("shift: skip invalid date from prayer api", map[string]any{"date": item.Date})
+			continue
+		}
+
+		// Convert day to enum match
+		dayOfWeek := strings.ToLower(parsedDate.Weekday().String())
+
+		// Parse times
+		dhuhrStart := item.Dzuhur + ":00"
+		ashrStart := item.Ashr + ":00"
+
+		tDhuhr, err := time.Parse("15:04:05", dhuhrStart)
+		if err != nil {
+			logger.Warn("shift: skip invalid dhuhr time", map[string]any{"time": item.Dzuhur})
+			continue
+		}
+		tAshr, err := time.Parse("15:04:05", ashrStart)
+		if err != nil {
+			logger.Warn("shift: skip invalid ashr time", map[string]any{"time": item.Ashr})
+			continue
+		}
+
+		dhuhrEnd := tDhuhr.Add(60 * time.Minute).Format("15:04:05")
+		ashrEnd := tAshr.Add(30 * time.Minute).Format("15:04:05")
+
+		if err := s.repo.UpdatePrayerTimesByDayOfWeek(ctx, tx, dayOfWeek, dhuhrStart, dhuhrEnd, ashrStart, ashrEnd); err != nil {
+			return fmt.Errorf("shift: update prayer times for %s: %w", dayOfWeek, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("shift: commit prayer times update: %w", err)
+	}
+
+	logger.Info("shift: prayer time sync completed", map[string]any{
+		"records_updated": len(apiResp.Data),
+	})
+	return nil
 }
 
 // ── Helper ────────────────────────────────────────────

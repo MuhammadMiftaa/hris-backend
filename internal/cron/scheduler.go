@@ -26,6 +26,7 @@ func NewScheduler(cronSvc service.CronService) *Scheduler {
 func (s *Scheduler) Start() {
 	go s.runDailyJobs()
 	go s.runHourlyJobs()
+	go s.runWeeklyJobs()
 	go s.runPushSender()
 	logger.Info("cron: scheduler started")
 }
@@ -107,6 +108,37 @@ func (s *Scheduler) runJobs() {
 }
 
 // ============================================================================
+// WEEKLY JOBS (Monday 00:01 WIB)
+// ============================================================================
+
+func (s *Scheduler) runWeeklyJobs() {
+	now := utils.NowWIB()
+	next := nextRunTimeWeekly(now, time.Monday, 0, 1)
+
+	timer := time.NewTimer(next.Sub(now))
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			ctx := context.Background()
+			logger.Info("cron: running weekly jobs", map[string]any{"time": utils.NowWIB()})
+			if err := s.cronSvc.RunWeeklyPrayerTimeSync(ctx); err != nil {
+				logger.Error("cron: weekly prayer time sync failed", map[string]any{
+					"error": err.Error(),
+				})
+			}
+			now = utils.NowWIB()
+			next = nextRunTimeWeekly(now, time.Monday, 0, 1)
+			timer.Reset(next.Sub(now))
+
+		case <-s.quit:
+			return
+		}
+	}
+}
+
+// ============================================================================
 // HOURLY JOBS (12:00 & 18:00 WIB)
 // ============================================================================
 
@@ -180,6 +212,16 @@ func (s *Scheduler) runPushSender() {
 func nextRunTime(now time.Time, hour, minute int) time.Time {
 	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
 	if now.After(next) || now.Equal(next) {
+		next = next.Add(24 * time.Hour)
+	}
+	return next
+}
+
+// nextRunTimeWeekly menghitung waktu berikutnya pada hari dan jam:menit yang ditentukan
+func nextRunTimeWeekly(now time.Time, weekday time.Weekday, hour, minute int) time.Time {
+	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+	// Adjust next until it matches the correct weekday and is in the future
+	for next.Weekday() != weekday || now.After(next) || now.Equal(next) {
 		next = next.Add(24 * time.Hour)
 	}
 	return next

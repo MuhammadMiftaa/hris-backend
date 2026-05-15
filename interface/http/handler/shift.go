@@ -355,3 +355,11 @@ func (h *ShiftHandler) CheckTodaySchedule(c *fiber.Ctx) error {
 	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "today schedule status", Data: result})
 }
 
+// SyncPrayerTimes — POST /shifts/sync-prayer-times
+func (h *ShiftHandler) SyncPrayerTimes(c *fiber.Ctx) error {
+	if err := h.service.SyncPrayerTimesForCurrentWeek(c.Context()); err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(dto.APIResponse{Status: true, StatusCode: 200, Message: "Jadwal sholat pekan ini berhasil disinkronkan"})
+}
+

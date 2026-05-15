@@ -23,6 +23,7 @@ func ShiftRoutes(app *fiber.App, db *gorm.DB) {
 		shifts.Get("/export", middleware.RBACMiddleware(data.PERM_TemplateShiftExport), h.ExportTemplates)
 		shifts.Get("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.DetailTemplate)
 		shifts.Post("/", middleware.RBACMiddleware(data.PERM_TemplateShiftCreate), h.CreateTemplate)
+		shifts.Post("/sync-prayer-times", middleware.RBACMiddleware(data.PERM_TemplateShiftUpdate), h.SyncPrayerTimes)
 		shifts.Put("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftUpdate), h.UpdateTemplate)
 		shifts.Delete("/:id", middleware.RBACMiddleware(data.PERM_TemplateShiftDelete), h.DeleteTemplate)
 		shifts.Get("/:id/details", middleware.RBACMiddleware(data.PERM_TemplateShiftRead), h.ListDetails)

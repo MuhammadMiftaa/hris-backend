@@ -215,14 +215,14 @@ func (s *holidayService) SyncFromExternalAPI(ctx context.Context, req dto.SyncHo
 
 func (s *holidayService) fetchExternalPage(ctx context.Context, year, page int) ([]dto.ExternalHolidayItem, int, error) {
 	apiURL := fmt.Sprintf("%s/holidays/indonesia/?year=%d&page=%d",
-		env.Cfg.ExternalAPI.IndonesiaHolidayAPIURL, year, page)
+		env.Cfg.ExternalAPI.APICOIDURL, year, page)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("build request: %w", err)
 	}
 	// Header auth sesuai spec: x-api-co-id
-	httpReq.Header.Set("x-api-co-id", env.Cfg.ExternalAPI.IndonesiaHolidayAPIKey)
+	httpReq.Header.Set("x-api-co-id", env.Cfg.ExternalAPI.APICOIDKey)
 	httpReq.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 15 * time.Second}
