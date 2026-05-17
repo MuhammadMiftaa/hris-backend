@@ -208,10 +208,10 @@ func (r *leaveRepository) GetBalanceByEmployeeAndType(ctx context.Context, tx Tr
 		  FROM leave_balance_adjustments
 		  GROUP BY leave_balance_id
 		) adj ON adj.leave_balance_id = b.id
-		WHERE b.employee_id = ? AND b.leave_type_id = ? AND b.year = ? AND b.deleted_at IS NULL AND b.effective_date <= ?
+		WHERE b.employee_id = ? AND b.leave_type_id = ? AND b.year = ? AND b.deleted_at IS NULL AND b.effective_date <= NOW()
 		LIMIT 1
 	`
-	err = db.Raw(query, employeeID, leaveTypeID, year, utils.NowWIB()).Scan(&res).Error
+	err = db.Raw(query, employeeID, leaveTypeID, year).Scan(&res).Error
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +508,7 @@ func (r *leaveRepository) UpdateApprovalStatus(ctx context.Context, tx Transacti
 		"status":      status,
 		"approver_id": approverID,
 		"notes":       notes,
-		"decided_at":  utils.NowWIB(),
+		"decided_at":  gorm.Expr("NOW()"),
 	}
 	return db.Model(&model.LeaveRequestApproval{}).Where("id = ?", approvalID).Updates(upd).Error
 }
@@ -664,9 +664,9 @@ func (r *leaveRepository) GetEmployeeBalanceSummary(ctx context.Context, tx Tran
 		  d.name AS department_name,
 		  jp.title AS job_position_title,
 		  b.year,
-		  SUM(CASE WHEN b.effective_date <= ? THEN b.allocated_duration + COALESCE(adj.total_delta, 0) ELSE 0 END) AS total_allocated,
+		  SUM(CASE WHEN b.effective_date <= NOW() THEN b.allocated_duration + COALESCE(adj.total_delta, 0) ELSE 0 END) AS total_allocated,
 		  SUM(b.used_duration) AS total_used,
-		  SUM((CASE WHEN b.effective_date <= ? THEN b.allocated_duration + COALESCE(adj.total_delta, 0) ELSE 0 END) - b.used_duration) AS total_remaining
+		  SUM((CASE WHEN b.effective_date <= NOW() THEN b.allocated_duration + COALESCE(adj.total_delta, 0) ELSE 0 END) - b.used_duration) AS total_remaining
 	` + baseQuery + `
 		GROUP BY e.id, e.full_name, d.name, jp.title, b.year
 	`
@@ -675,10 +675,7 @@ func (r *leaveRepository) GetEmployeeBalanceSummary(ctx context.Context, tx Tran
 	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var res []dto.EmployeeBalanceSummaryResponse
-	selectArgs := make([]interface{}, 0, len(args)+2)
-	selectArgs = append(selectArgs, utils.NowWIB(), utils.NowWIB())
-	selectArgs = append(selectArgs, args...)
-	if err := db.Raw(selectQuery, selectArgs...).Scan(&res).Error; err != nil {
+	if err := db.Raw(selectQuery, args...).Scan(&res).Error; err != nil {
 		return dto.PaginatedResponse[dto.EmployeeBalanceSummaryResponse]{}, err
 	}
 
@@ -758,17 +755,16 @@ func (r *leaveRepository) UpsertBalance(ctx context.Context, tx Transaction, req
 	query := `
 		INSERT INTO leave_balances
 			(employee_id, leave_type_id, year, allocated_duration, effective_date, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
 		ON CONFLICT (employee_id, leave_type_id, year) WHERE deleted_at IS NULL
 		DO UPDATE SET
 			allocated_duration = EXCLUDED.allocated_duration,
 			effective_date     = EXCLUDED.effective_date,
 			notes              = EXCLUDED.notes,
-			updated_at         = ?
+			updated_at         = NOW()
 		RETURNING *
 	`
-	now := utils.NowWIB()
-	if err := db.Raw(query, req.EmployeeID, req.LeaveTypeID, req.Year, req.AllocatedDuration, effDate, req.Notes, now, now, now).Scan(&m).Error; err != nil {
+	if err := db.Raw(query, req.EmployeeID, req.LeaveTypeID, req.Year, req.AllocatedDuration, effDate, req.Notes).Scan(&m).Error; err != nil {
 		return model.LeaveBalance{}, err
 	}
 	return m, nil

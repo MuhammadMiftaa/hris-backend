@@ -207,7 +207,7 @@ func (s *notificationService) TriggerPrayerReminder(ctx context.Context, employe
 		if err != nil {
 			t = time.Now()
 		}
-		sendAt = t
+		sendAt = t.Add(-7 * time.Hour)
 	}
 
 	return s.createNotification(ctx, employeeID, "prayer_reminder", title, body, "/", "me", nil, nil, sendAt)
@@ -223,9 +223,9 @@ func (s *notificationService) calculateReminderSendAt(dateStr, timeStr string) t
 	t, err := time.ParseInLocation(layout, datetimeStr, time.Local)
 	if err != nil {
 		// fallback ke sekarang jika parse gagal
-		return time.Now()
+		return time.Now().Add(-7 * time.Hour)
 	}
-	return t.Add(-10 * time.Minute)
+	return t.Add(-10 * time.Minute).Add(-7 * time.Hour)
 }
 
 func (s *notificationService) TriggerRequestApprovalNotification(ctx context.Context, requestType string, entityID uint, requesterEmployeeID uint) error {
