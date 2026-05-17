@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"hris-backend/internal/struct/dto"
 	"hris-backend/internal/struct/model"
@@ -72,8 +73,8 @@ func (r *notificationRepository) GetByEmployee(ctx context.Context, tx Transacti
 		return dto.PaginatedResponse[dto.NotificationResponse]{}, err
 	}
 
-	baseQuery := `FROM notifications WHERE employee_id = ? AND deleted_at IS NULL AND send_at <= NOW()`
-	args := []interface{}{employeeID}
+	baseQuery := `FROM notifications WHERE employee_id = ? AND deleted_at IS NULL AND send_at <= ?`
+	args := []interface{}{employeeID, utils.NowWIB()}
 
 	if params.IsRead != nil {
 		baseQuery += " AND is_read = ?"
@@ -128,7 +129,7 @@ func (r *notificationRepository) GetUnreadCount(ctx context.Context, tx Transact
 	}
 	var count int64
 	err = db.Model(&model.Notification{}).
-		Where("employee_id = ? AND is_read = FALSE AND deleted_at IS NULL AND send_at <= NOW()", employeeID).
+		Where("employee_id = ? AND is_read = FALSE AND deleted_at IS NULL AND send_at <= ?", employeeID, utils.NowWIB()).
 		Count(&count).Error
 	return count, err
 }
@@ -142,7 +143,7 @@ func (r *notificationRepository) MarkAsRead(ctx context.Context, tx Transaction,
 		Where("id = ? AND employee_id = ? AND deleted_at IS NULL", notificationID, employeeID).
 		Updates(map[string]interface{}{
 			"is_read": true,
-			"read_at": gorm.Expr("NOW()"),
+			"read_at": utils.NowWIB(),
 		}).Error
 }
 
@@ -155,7 +156,7 @@ func (r *notificationRepository) MarkAllAsRead(ctx context.Context, tx Transacti
 		Where("employee_id = ? AND is_read = FALSE AND deleted_at IS NULL", employeeID).
 		Updates(map[string]interface{}{
 			"is_read": true,
-			"read_at": gorm.Expr("NOW()"),
+			"read_at": utils.NowWIB(),
 		}).Error
 }
 
@@ -168,7 +169,7 @@ func (r *notificationRepository) UpdatePushStatus(ctx context.Context, tx Transa
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"push_status":     status,
-			"last_attempt_at": gorm.Expr("NOW()"),
+			"last_attempt_at": utils.NowWIB(),
 		}).Error
 }
 
@@ -181,7 +182,7 @@ func (r *notificationRepository) IncrementPushAttempts(ctx context.Context, tx T
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"push_attempts":   gorm.Expr("push_attempts + 1"),
-			"last_attempt_at": gorm.Expr("NOW()"),
+			"last_attempt_at": utils.NowWIB(),
 		}).Error
 }
 
@@ -286,11 +287,11 @@ func (r *notificationRepository) GetPendingNotifications(ctx context.Context, tx
 		deleted_at IS NULL
 		AND push_status IN ('pending', 'failed')
 		AND push_attempts < 3
-		AND send_at <= NOW() + INTERVAL '1200 minutes'
+		AND send_at <= ?
 		AND (
 			last_attempt_at IS NULL
-			OR last_attempt_at < NOW() - INTERVAL '2 minutes'
+			OR last_attempt_at < ?
 		)
-	`).Order("send_at ASC, created_at ASC").Limit(limit).Find(&notifications).Error
+	`, utils.NowWIB(), utils.NowWIB().Add(-2*time.Minute)).Order("send_at ASC, created_at ASC").Limit(limit).Find(&notifications).Error
 	return notifications, err
 }
