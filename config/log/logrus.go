@@ -237,7 +237,7 @@ func SetupGormLogger() *GormLogger {
 	case data.PRODUCTION_MODE:
 		level = logger.Error // production: hanya error
 	case data.STAGING_MODE:
-		level = logger.Warn // staging: error + slow query
+		level = logger.Info // staging: error + slow query
 	default:
 		level = logger.Info // development: semua query
 	}
