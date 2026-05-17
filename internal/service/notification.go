@@ -182,16 +182,16 @@ func (s *notificationService) TriggerPrayerReminder(ctx context.Context, employe
 	var title, body string
 	if isStart && prayerName == "Zuhur" {
 		title = fmt.Sprintf("Waktu %s", prayerName)
-		body = fmt.Sprintf("Waktu istirahat Dzuhur telah tiba (%s). Jangan lupa untuk menunaikan sholat Dzuhur ya.", prayerName, prayerTime)
+		body = fmt.Sprintf("Waktu istirahat Dzuhur telah tiba (%s). Jangan lupa untuk menunaikan sholat Dzuhur ya.", prayerTime)
 	} else if !isStart && prayerName == "Zuhur" {
 		title = fmt.Sprintf("Akhir Waktu %s", prayerName)
-		body = fmt.Sprintf("Waktu istirahat Dzuhur akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerName, prayerTime)
+		body = fmt.Sprintf("Waktu istirahat Dzuhur akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerTime)
 	} else if isStart && prayerName == "Asar" {
 		title = fmt.Sprintf("Waktu %s", prayerName)
-		body = fmt.Sprintf("Waktu sholat Ashar telah tiba (%s). Jangan lupa untuk menunaikan sholat Ashar ya.", prayerName, prayerTime)
+		body = fmt.Sprintf("Waktu sholat Ashar telah tiba (%s). Jangan lupa untuk menunaikan sholat Ashar ya.", prayerTime)
 	} else if !isStart && prayerName == "Asar" {
 		title = fmt.Sprintf("Akhir Waktu %s", prayerName)
-		body = fmt.Sprintf("Waktu sholat Ashar akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerName, prayerTime)
+		body = fmt.Sprintf("Waktu sholat Ashar akan segera berakhir (%s). Yuk bersiap kembali bekerja.", prayerTime)
 	}
 
 	var sendAt time.Time

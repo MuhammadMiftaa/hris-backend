@@ -21,7 +21,7 @@ type NotificationResponse struct {
 	PushStatus        string     `json:"push_status"`
 	RelatedEntityType string     `json:"related_entity_type"`
 	RelatedEntityID   *uint      `json:"related_entity_id"`
-	CreatedAt         time.Time  `json:"created_at"`
+	SendAt            time.Time  `json:"send_at"`
 }
 
 // MarkAsReadRequest — body untuk mark as read (kosong = mark all)

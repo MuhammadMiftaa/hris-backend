@@ -72,7 +72,7 @@ func (r *notificationRepository) GetByEmployee(ctx context.Context, tx Transacti
 		return dto.PaginatedResponse[dto.NotificationResponse]{}, err
 	}
 
-	baseQuery := `FROM notifications WHERE employee_id = ? AND deleted_at IS NULL`
+	baseQuery := `FROM notifications WHERE employee_id = ? AND deleted_at IS NULL AND send_at <= NOW()`
 	args := []interface{}{employeeID}
 
 	if params.IsRead != nil {
@@ -89,10 +89,10 @@ func (r *notificationRepository) GetByEmployee(ctx context.Context, tx Transacti
 		id, type, title, body, action_url, action_tab,
 		is_read, read_at, push_status,
 		related_entity_type, related_entity_id,
-		created_at
+		send_at
 	` + baseQuery
 
-	selectQuery += utils.BuildSortClause("notification", params.SortBy, params.GetSortDir(), "created_at DESC")
+	selectQuery += utils.BuildSortClause("notification", params.SortBy, params.GetSortDir(), "send_at DESC")
 	selectQuery += utils.BuildPaginationClause(params.PaginationParams)
 
 	var rows []dto.NotificationResponse
@@ -128,7 +128,7 @@ func (r *notificationRepository) GetUnreadCount(ctx context.Context, tx Transact
 	}
 	var count int64
 	err = db.Model(&model.Notification{}).
-		Where("employee_id = ? AND is_read = FALSE AND deleted_at IS NULL", employeeID).
+		Where("employee_id = ? AND is_read = FALSE AND deleted_at IS NULL AND send_at <= NOW()", employeeID).
 		Count(&count).Error
 	return count, err
 }
@@ -286,7 +286,7 @@ func (r *notificationRepository) GetPendingNotifications(ctx context.Context, tx
 		deleted_at IS NULL
 		AND push_status IN ('pending', 'failed')
 		AND push_attempts < 3
-		AND send_at <= NOW()
+		AND send_at <= NOW() + INTERVAL '1200 minutes'
 		AND (
 			last_attempt_at IS NULL
 			OR last_attempt_at < NOW() - INTERVAL '2 minutes'
